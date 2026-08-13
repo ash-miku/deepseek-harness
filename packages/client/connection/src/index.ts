@@ -67,44 +67,23 @@ export const Config: z<ConnectionConfig> = z.object({
 })
 
 /**
- * Methods gated to loopback even on a trusted-host deployment. Native dialogs
- * act on the host machine, and the agent-preset management plane changes the
- * runtime composition or drives the host desktop. The settings, credential,
- * and model-discovery plane is intentionally NOT here: the web profile derives
- * its LAN IP literals as trusted authorities, so a LAN browser's settings page
- * can read and configure the deployment it is connected to. `trustedHosts` is
- * a DNS-rebinding fence, not an authentication layer, so exposing it beyond a
- * trusted network still requires a real auth layer in front of this server.
+ * The /api trust fence is the whole configuration plane's boundary: loopback
+ * and deployment-derived LAN IP literals plus any declared `trustedHosts`
+ * authority may read and configure the deployment they are connected to.
+ * Native dialogs (directory picking, path opening) and the agent-preset
+ * management plane ride the same fence — this deployment serves LAN and
+ * ZeroTier pages deliberately, so no method is pinned to loopback beyond it.
+ * `trustedHosts` is a DNS-rebinding fence, not an authentication layer, so
+ * exposing it beyond a trusted network still requires a real auth layer in
+ * front of this server.
  */
-const LOOPBACK_ONLY_METHODS = new Set([
-  // A preset composition names the plugins a session runs, so reading one is
-  // reconnaissance; copy and remove rearrange what the deployment offers, and
-  // openDocument drives the host desktop — all more than the roster beside
-  // them. (Authoring is copy-only, so no method here accepts composition text
-  // or a path; the pin is about who may manage the roster at all.)
-  //
-  // CHOOSING one is not pinned, and `agentPreset.list` is not either. Picking a
-  // preset looks like escalation — one of them mounts the toolset that edits the
-  // live runtime — but `session.create` already takes an `agentPreset`, so
-  // pinning only the switch would leave the same capability one method over.
-  // The deeper reason is that the capability is not the preset's to grant: the
-  // deployment's own default already carries `bash` and the filesystem tools, so
-  // any caller that may start a session at all can already run commands as this
-  // process. Pinning the switch would be a fence beside an open gate.
-  'agentPreset.read',
-  'agentPreset.copy',
-  'agentPreset.openDocument',
-  'agentPreset.remove',
-  'host.pickDirectory',
-  'host.openPath',
-])
 
 /**
  * Mounts the API gateway under the browser transport prefix. Every request on
  * the prefix passes the browser-trust fence first (DNS-rebinding and
- * cross-site defense — [api-request-trust](./api-request-trust.ts));
- * loopback-only methods additionally pass it with an empty trust list, which
- * pins them to loopback.
+ * cross-site defense — [api-request-trust](./api-request-trust.ts)); every
+ * fence-accepted method then reaches the bridge, loopback and trusted pages
+ * alike.
  * @param ctx - Host plugin context.
  * @param config - resolved plugin config (schema defaults applied).
  */
@@ -120,14 +99,6 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
   const fetchHandler = connection.createSharedFetchHandler(API_PATH, {
     async fetch(request) {
       const pathname = new URL(request.url).pathname
-      const method = pathname.startsWith(`${API_PATH}/`)
-        ? pathname.slice(API_PATH.length + 1)
-        : undefined
-      if (method !== undefined
-        && LOOPBACK_ONLY_METHODS.has(method)
-        && !isTrustedApiRequest(request, [])) {
-        return new Response('forbidden', { status: 403 })
-      }
       if (request.method === 'GET' && (pathname === MUX_EVENTS_PATH || pathname === HOST_EVENTS_PATH)) {
         return new Response('upgrade required', {
           status: 426,

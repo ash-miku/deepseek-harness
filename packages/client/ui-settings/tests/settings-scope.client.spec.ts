@@ -402,11 +402,12 @@ describe('SettingsScopeBinder.bind', () => {
     expect(describeCall).toHaveBeenCalledTimes(3)
   })
 
-  it('binds a remote browser in memory mode without starting a settings read', async () => {
-    const describeCall = vi.fn()
+  it('probes a remote browser and downgrades to memory when the trust fence refuses', async () => {
+    const describeCall = vi.fn().mockRejectedValueOnce(new Error('transport failure for /api/settings.describe: HTTP 403'))
+    const mutate = vi.fn()
     const ctx = new Context()
     ctx.provide('connection', {
-      api: { settings: { describe: describeCall } },
+      api: { settings: { describe: describeCall, mutate } },
       isLoopback: false,
     } as never)
     let scope!: SettingsScope<UiTestSettings>
@@ -419,8 +420,44 @@ describe('SettingsScopeBinder.bind', () => {
       },
     })
     await fiber.await()
-    expect(scope.getSnapshot()).toMatchObject({ status: 'unavailable', mode: 'memory', writable: false })
+    await vi.waitFor(() => {
+      expect(scope.getSnapshot()).toMatchObject({ status: 'unavailable', mode: 'memory', writable: false })
+    })
+    // The refusal is a verdict: later gestures stay process-local and the
+    // Host is never touched again.
+    await scope.set('preference', 'dark')
+    expect(describeCall).toHaveBeenCalledOnce()
+    expect(mutate).not.toHaveBeenCalled()
     await fiber.dispose()
-    expect(describeCall).not.toHaveBeenCalled()
+  })
+
+  it('persists a fence-accepted remote browser exactly like loopback', async () => {
+    const describeCall = vi.fn().mockResolvedValue(described({ preference: 'system' }, 1))
+    const mutate = vi.fn().mockResolvedValueOnce(ok(view({ preference: 'dark' }, 2)))
+    const ctx = new Context()
+    ctx.provide('connection', {
+      api: { settings: { describe: describeCall, mutate } },
+      isLoopback: false,
+    } as never)
+    let scope!: SettingsScope<UiTestSettings>
+    new TestRemote(ctx)
+    await ctx.plugin(SettingsScopeBinder).await()
+    const fiber = ctx.plugin({
+      inject: ['connection', 'remote', 'settingsScope'],
+      apply: (plugin: Context) => {
+        scope = plugin.settingsScope.bind<UiTestSettings>({ namespace: 'ui-test' })
+      },
+    })
+    await fiber.await()
+    await vi.waitFor(() => {
+      expect(scope.getSnapshot()).toMatchObject({ status: 'ready', value: { preference: 'system' }, revision: 1 })
+    })
+    await scope.set('preference', 'dark')
+    expect(mutate).toHaveBeenCalledWith({
+      ns: 'ui-test',
+      ops: [{ op: 'set', path: ['preference'], value: 'dark' }],
+      expectedRevision: 1,
+    })
+    await fiber.dispose()
   })
 })

@@ -161,26 +161,29 @@ describe('connection node half', () => {
     await dispose()
   })
 
-  it('pins loopback-only methods to loopback even for a declared trusted authority', async () => {
+  it('lets a declared trusted authority reach preset management and native dialogs', async () => {
     const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
     for (const method of [
       'host.pickDirectory', 'host.openPath',
-      // A composition names the plugins a session runs: reading one is
-      // reconnaissance, and copy/remove/openDocument manage the roster and
-      // drive the host desktop.
       'agentPreset.read', 'agentPreset.copy', 'agentPreset.openDocument', 'agentPreset.remove',
     ]) {
-      const denied = fakeResponse()
+      const allowed = fakeResponse()
       await routes[0]!.handler(
         fakeRequest({ host: 'harness.example' }, `${API_PATH}/${method}`),
-        denied.response,
+        allowed.response,
       )
-      expect(denied.state.status).toBe(403)
-      expect(denied.state.body).toBe('forbidden')
+      // 404 is the empty proxy's carrier answer — the fence passed and the
+      // bridge ran, exactly like the settings plane beside them.
+      expect(allowed.state.status).toBe(404)
     }
-    const read = fakeResponse()
-    await routes[0]!.handler(fakeRequest({ host: 'harness.example' }), read.response)
-    expect(read.state.status).not.toBe(403)
+    // The same methods stay behind the general fence for an untrusted Host.
+    const denied = fakeResponse()
+    await routes[0]!.handler(
+      fakeRequest({ host: 'other.example' }, `${API_PATH}/host.openPath`),
+      denied.response,
+    )
+    expect(denied.state.status).toBe(403)
+    expect(denied.state.body).toBe('forbidden')
     await dispose()
   })
 
@@ -462,21 +465,17 @@ describe('connection node half over a real HTTP server', () => {
     })
   }
 
-  it('answers a declared LAN authority with 403 on loopback-only methods but allows settings, over real HTTP', async () => {
+  it('answers a declared LAN authority for every method, over real HTTP', async () => {
     // The fence's input is a real IncomingMessage parsed by Node from the
     // wire, not a hand-assembled object: the Host header a LAN browser sends
-    // is exactly what decides loopback-only here, so the boundary is asserted
-    // against the parse the server actually performs.
+    // is exactly what decides trust here, so the boundary is asserted against
+    // the parse the server actually performs.
     const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
     const { port, close } = await serve(routes)
     try {
       for (const method of [
         'host.pickDirectory', 'host.openPath',
         'agentPreset.read', 'agentPreset.copy', 'agentPreset.openDocument', 'agentPreset.remove',
-      ]) {
-        expect([method, await call(port, method, 'harness.example')]).toEqual([method, 403])
-      }
-      for (const method of [
         'settings.describe', 'settings.openDocument', 'settings.update', 'settings.replace', 'settings.mutate',
         'credentials.describe', 'credentials.set', 'credentials.unset',
         'llm.discoverModels',
@@ -494,6 +493,9 @@ describe('connection node half over a real HTTP server', () => {
       for (const method of ['llm.providers', 'llm.models', 'agentPreset.list', 'agentPreset.select']) {
         expect([method, await call(port, method, 'harness.example')]).toEqual([method, 404])
       }
+      // A host the fence does not know is refused on every method, native
+      // dialogs included.
+      expect(await call(port, 'host.openPath', 'other.example')).toBe(403)
       // Loopback reaches everything, configuration included.
       expect(await call(port, 'settings.describe', `127.0.0.1:${String(port)}`)).toBe(404)
     } finally {

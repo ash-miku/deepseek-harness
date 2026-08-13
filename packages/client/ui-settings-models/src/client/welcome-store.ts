@@ -24,7 +24,12 @@ function acknowledgementOf(view: SettingsNamespaceView): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
-/** Coordinates durable Host acknowledgement or a process-local remote fallback. */
+/**
+ * Coordinates durable Host acknowledgement or a process-local remote fallback.
+ * A probe controller starts in Host mode and falls back to memory only when
+ * the /api trust fence refuses the page (HTTP 403), so a LAN/ZeroTier page
+ * the deployment trusts persists the acknowledgement like loopback.
+ */
 export class WelcomeNoticeStore {
   /** uSES-safe state source shared by the registered welcome step. */
   readonly store: SnapshotStore<WelcomeNoticeState> = createSnapshotStore({
@@ -32,15 +37,19 @@ export class WelcomeNoticeStore {
   })
 
   private generation = 0
+  /** Mutable: a probe controller downgrades to memory on a fence refusal. */
+  private persistence: 'host' | 'memory' | 'probe'
 
   /**
    * @param api - settings wire face used for durable reads and writes.
-   * @param persistence - remote browsers use memory because settings is loopback-only.
+   * @param persistence - `memory` keeps refused pages process-local; `probe` persists when the trust fence accepts the page.
    */
   constructor(
     private readonly api: Pick<IApiClient, 'settings'>,
-    private readonly persistence: 'host' | 'memory' = 'host',
-  ) {}
+    persistence: 'host' | 'memory' | 'probe' = 'host',
+  ) {
+    this.persistence = persistence
+  }
 
   /** Load the acknowledgement from Host settings or initialize process-local state. */
   async load(): Promise<void> {
@@ -65,6 +74,13 @@ export class WelcomeNoticeStore {
       })
     } catch (error) {
       if (generation !== this.generation) return
+      // A fence refusal is a verdict: settle process-locally instead of
+      // surfacing a settings error the user cannot act on.
+      if (isFenceRefusal(error)) {
+        this.persistence = 'memory'
+        this.store.update((state) => { state.status = 'ready'; state.error = null })
+        return
+      }
       this.store.update((state) => {
         state.status = 'error'
         state.acknowledged = false
@@ -74,7 +90,7 @@ export class WelcomeNoticeStore {
   }
 
   /**
-   * Persist this copy version, or advance only this process for a remote browser.
+   * Persist this copy version, or advance only this process for a refused page.
    * @returns true when the selected persistence mode accepted the acknowledgement.
    */
   async acknowledge(): Promise<boolean> {
@@ -103,16 +119,34 @@ export class WelcomeNoticeStore {
       }
       return true
     } catch (error) {
-      if (generation === this.generation) {
+      if (generation !== this.generation) return false
+      if (isFenceRefusal(error)) {
+        this.persistence = 'memory'
         this.store.update((state) => {
-          state.status = 'error'
-          state.acknowledged = false
-          state.error = messageOf(error)
+          state.status = 'ready'
+          state.acknowledged = true
+          state.error = null
         })
+        return true
       }
+      this.store.update((state) => {
+        state.status = 'error'
+        state.acknowledged = false
+        state.error = messageOf(error)
+      })
       return false
     }
   }
+}
+
+/**
+ * Whether a settings transport failure is the /api trust fence refusing the
+ * page (HTTP 403): the fetch carrier surfaces every non-2xx as a throw whose
+ * message names the status, so the fence verdict is distinguishable from
+ * transient network failures.
+ */
+function isFenceRefusal(error: unknown): boolean {
+  return error instanceof Error && /^transport failure for \/api\/[^:]+: HTTP 403$/.test(error.message)
 }
 
 /**

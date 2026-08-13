@@ -282,13 +282,11 @@ describe('ProducedFiles row', () => {
   const t = makeTranslate(zh)
   const capability = (
     canOpenPath: boolean | undefined,
-    isLoopback = true,
-  ): Pick<ProducedFilesProps, 'isLoopback' | 'useHostDescription'> => {
+  ): Pick<ProducedFilesProps, 'useHostDescription'> => {
     const description = canOpenPath === undefined
       ? undefined
       : { version: 'test', cwd: '/workspace', attachedSessions: 1, canOpenPath }
     return {
-      isLoopback,
       useHostDescription: selector => selector(description),
     }
   }
@@ -388,7 +386,7 @@ describe('ProducedFiles row', () => {
     )
     const overflowing = ['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md']
     expect(view.queryByRole('button', { name: '在文件夹中显示' })).toBeNull()
-    for (const unavailable of [capability(false), capability(true, false), capability(undefined)]) {
+    for (const unavailable of [capability(false), capability(undefined)]) {
       view.rerender(<ProducedFiles matched={overflowing} openFile={openFile} {...unavailable} t={t} />)
       expect(view.queryByRole('button', { name: '在文件夹中显示' })).toBeNull()
     }
@@ -475,7 +473,7 @@ describe('plugin registration', () => {
     await fiber.await()
     const [entry] = ctx.slots.entries('conversation.chat.turnTail')
     expect(entry).toBeDefined()
-    expect(entry?.inject?.()).toEqual({ isLoopback: false, hooks: { hostDescription } })
+    expect(entry?.inject?.()).toEqual({ hooks: { hostDescription } })
 
     // The prose face is live while the plugin is: a produced turn yields a
     // resolver whose matches open through the owner-supplied opener.

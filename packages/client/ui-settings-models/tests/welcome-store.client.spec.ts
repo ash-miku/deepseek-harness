@@ -46,6 +46,40 @@ describe('WelcomeNoticeStore', () => {
     expect(mutate).not.toHaveBeenCalled()
   })
 
+  it('downgrades a refused probe page to memory instead of surfacing the fence error', async () => {
+    const describe = vi.fn(() => Promise.reject(new Error('transport failure for /api/settings.describe: HTTP 403')))
+    const mutate = vi.fn(() => Promise.reject(new Error('transport failure for /api/settings.mutate: HTTP 403')))
+    const controller = new WelcomeNoticeStore({ settings: { describe, mutate } } as never, 'probe')
+
+    await controller.load()
+    expect(controller.store.getSnapshot()).toEqual({ status: 'ready', acknowledged: false, error: null })
+    await expect(controller.acknowledge()).resolves.toBe(true)
+    expect(controller.store.getSnapshot()).toEqual({ status: 'ready', acknowledged: true, error: null })
+    // The downgrade is durable for the page: reloads stay process-local and
+    // the wire is never touched again.
+    await controller.load()
+    expect(controller.store.getSnapshot()).toEqual({ status: 'ready', acknowledged: true, error: null })
+    expect(describe).toHaveBeenCalledOnce()
+    expect(mutate).not.toHaveBeenCalled()
+  })
+
+  it('persists a fence-accepted probe page through Host settings', async () => {
+    const describe = vi.fn(() => Promise.resolve(ok({
+      writable: true, hasDocument: false, namespaces: [namespace()],
+    })))
+    const mutate = vi.fn(() => Promise.resolve(ok(namespace(WELCOME_NOTICE_VERSION))))
+    const controller = new WelcomeNoticeStore({ settings: { describe, mutate } } as never, 'probe')
+
+    await controller.load()
+    expect(controller.store.getSnapshot()).toMatchObject({ status: 'ready', acknowledged: false })
+    await expect(controller.acknowledge()).resolves.toBe(true)
+    expect(mutate).toHaveBeenCalledWith({
+      ns: WELCOME_NOTICE_SETTINGS_NAMESPACE,
+      ops: [{ op: 'set', path: [WELCOME_NOTICE_ACK_FIELD], value: WELCOME_NOTICE_VERSION }],
+    })
+    expect(controller.store.getSnapshot()).toMatchObject({ status: 'ready', acknowledged: true })
+  })
+
   it('acknowledges only the exact current copy version', async () => {
     for (const [version, acknowledged] of [
       [undefined, false],

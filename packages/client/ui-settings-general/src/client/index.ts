@@ -69,15 +69,31 @@ export function apply(ctx: ClientContext): void {
   // locale/change re-registration wiring.
   const t = ctx.locale.bind(NS)
   const connection = ctx.get('connection') as ConnectionHandle
-  const documentController = connection.isLoopback
-    ? new SettingsDocumentStore(connection.api)
-    : undefined
-  const documentInjected = documentController === undefined
-    ? undefined
-    : (() => {
-      const useSnapshot = bindSnapshotSelector(documentController.store)
-      return (): SettingsDocumentActionInjected => ({ controller: documentController, useSnapshot })
-    })()
+  const documentController = new SettingsDocumentStore(connection.api)
+  const documentInjected = (): SettingsDocumentActionInjected => {
+    const useSnapshot = bindSnapshotSelector(documentController.store)
+    return { controller: documentController, useSnapshot }
+  }
+  // The local-document action drives the Host desktop, so it registers only
+  // once the /api trust fence has accepted this page: loopback qualifies at
+  // once, and a LAN/ZeroTier page qualifies the moment the connection settles
+  // (the host.describe riding the same fence has already succeeded by then).
+  let documentActionRegistered = false
+  const registerDocumentAction = (): void => {
+    if (documentActionRegistered) return
+    if (!connection.isLoopback && connection.hostDescription.getSnapshot() === undefined) return
+    documentActionRegistered = true
+    ctx.slots.inject('settings.action', () => ctx.slots.register({
+      name: 'settings.action',
+      id: 'open-document',
+      order: 0,
+      locale: NS,
+      inject: documentInjected,
+    }, SettingsDocumentAction))
+  }
+  registerDocumentAction()
+  ctx.effect(() => connection.hostDescription.subscribe(registerDocumentAction),
+    'ui-settings-general: document-action fence trust')
   ctx.effect(() => ctx.on('connection/reset', () => {
     refreshDocumentIfLoaded(documentController)
   }), 'ui-settings-general: metadata invalidations')
@@ -156,15 +172,6 @@ export function apply(ctx: ClientContext): void {
     ctx.slots.register({ name: 'settings.trigger', locale: NS }, TriggerContent))
   ctx.slots.inject('settings.header', () =>
     ctx.slots.register({ name: 'settings.header', locale: NS }, HeaderContent))
-  if (documentInjected !== undefined) {
-    ctx.slots.inject('settings.action', () => ctx.slots.register({
-      name: 'settings.action',
-      id: 'open-document',
-      order: 0,
-      locale: NS,
-      inject: documentInjected,
-    }, SettingsDocumentAction))
-  }
   ctx.slots.inject('settings.close', () =>
     ctx.slots.register({ name: 'settings.close', locale: NS }, CloseLabel))
   ctx.slots.inject('settings.section', () => ctx.slots.register({

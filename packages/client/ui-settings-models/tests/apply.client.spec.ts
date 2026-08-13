@@ -14,7 +14,7 @@ import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
 // the shipped Chinese copy, so they state the browser they assume.
 usePinnedBrowserLanguages('zh-CN')
 
-async function bench(isLoopback = true) {
+async function bench(isLoopback = true, settings?: unknown) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
@@ -24,7 +24,10 @@ async function bench(isLoopback = true) {
   new TestRemote(ctx)
   // The apply path only captures the wire face; no call leaves this fake
   // until a section actually loads.
-  ctx.provide('connection', { api: {}, isLoopback } as never)
+  ctx.provide('connection', {
+    api: settings === undefined ? {} : { settings },
+    isLoopback,
+  } as never)
   return { ctx, slots: ctx.get('slots') as SlotRegistry, locale }
 }
 
@@ -143,8 +146,13 @@ describe('ui-settings-models apply', () => {
     expect(() => b.locale.register('settings.models', 'en', {})).not.toThrow()
   })
 
-  it('keeps remote-browser acknowledgement in process memory', async () => {
-    const b = await bench(false)
+  it('keeps remote-browser acknowledgement in process memory when the trust fence refuses', async () => {
+    // The refused page is exactly what a stock loopback-only deployment
+    // answers a LAN probe with: HTTP 403 from the /api fence, which settles
+    // the probe controller into process-local memory mode.
+    const b = await bench(false, {
+      describe: () => Promise.reject(new Error('transport failure for /api/settings.describe: HTTP 403')),
+    })
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries('settings.onboarding')

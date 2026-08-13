@@ -34,10 +34,30 @@ import type {} from '@deepseek-ai/dsh-settings/types'
 type SettingsFace = Pick<IApiClient, 'settings'>
 
 /**
+ * Whether a settings transport failure is the /api trust fence refusing the
+ * page (HTTP 403). The fetch carrier surfaces every non-2xx as a throw whose
+ * message names the status (`transport failure for <path>: HTTP <status>`),
+ * so the fence verdict is distinguishable from transient network failures,
+ * which must keep a probe scope loading for a later retry.
+ */
+function isFenceRefusal(error: unknown): boolean {
+  return error instanceof Error && /^transport failure for \/api\/[^:]+: HTTP 403$/.test(error.message)
+}
+
+/**
  * Serializes one namespace's Host reads and writes behind a snapshot store.
  * Reads never block plugin activation; writes carry the latest known
  * namespace revision and teardown waits for the operation already crossing
  * the wire.
+ *
+ * Persistence has three modes: `host` (loopback pages — every operation
+ * reaches the Host), `memory` (pages the /api trust fence refuses — a silent
+ * process-local no-op), and `probe` (non-loopback pages: start like `host` and
+ * let the fence verdict decide). A probe scope downgrades itself to `memory`
+ * the moment the fence refuses a settings call with HTTP 403, so a LAN or
+ * ZeroTier page the deployment trusts persists exactly like loopback, while a
+ * refused page keeps the historical remote-browser behavior — and no settings
+ * data ever leaves a Host that refused it.
  */
 export class SettingsScopeController<T> implements SettingsScope<T> {
   private readonly store: SnapshotStore<SettingsScopeSnapshot<T>>
@@ -45,25 +65,28 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
   private readGeneration = 0
   private writeGeneration = 0
   private disposed = false
+  /** Mutable: a probe scope downgrades to `memory` on a fence refusal. */
+  private persistence: 'host' | 'memory' | 'probe'
 
   /**
    * @param api - settings wire face.
    * @param spec - namespace identity and optional narrowing decoder.
-   * @param persistence - remote browsers remain process-local because settings RPCs are loopback-only.
+   * @param persistence - `memory` keeps remote pages process-local without any settings call; `probe` tries Host persistence and downgrades on a trust-fence refusal.
    */
   constructor(
     private readonly api: SettingsFace,
     private readonly spec: SettingsScopeSpec<T>,
-    private readonly persistence: 'host' | 'memory' = 'host',
+    persistence: 'host' | 'memory' | 'probe' = 'host',
   ) {
+    this.persistence = persistence
     this.store = createSnapshotStore<SettingsScopeSnapshot<T>>({
-      status: persistence === 'host' ? 'loading' : 'unavailable',
+      status: persistence === 'memory' ? 'unavailable' : 'loading',
       value: undefined,
       base: undefined,
       user: undefined,
       revision: undefined,
       writable: false,
-      mode: persistence,
+      mode: persistence === 'memory' ? 'memory' : 'host',
     })
   }
 
@@ -123,7 +146,14 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
           ops: [op],
           ...(revision === undefined ? {} : { expectedRevision: revision }),
         })
-      } catch (_settingsWriteFailure) {
+      } catch (settingsWriteFailure) {
+        // A fence refusal is a verdict, not a transient failure: the page is
+        // not trusted, so no recovery read (the Host refused it) and the
+        // scope settles into process-local memory mode.
+        if (isFenceRefusal(settingsWriteFailure)) {
+          this.downgrade()
+          return
+        }
         if (!this.disposed && generation === this.writeGeneration) await this.read(++this.readGeneration)
         return
       }
@@ -146,6 +176,23 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     await this.tail
   }
 
+  /**
+   * Settle a probe scope into process-local memory mode after the /api trust
+   * fence refused the page. Bumping both generations suppresses any in-flight
+   * publication that crossed the wire before the refusal.
+   */
+  private downgrade(): void {
+    if (this.disposed || this.persistence === 'memory') return
+    this.persistence = 'memory'
+    this.readGeneration += 1
+    this.writeGeneration += 1
+    this.store.update((draft) => {
+      draft.status = 'unavailable'
+      draft.writable = false
+      draft.mode = 'memory'
+    })
+  }
+
   private enqueue(operation: () => Promise<void>): Promise<void> {
     if (this.persistence === 'memory' || this.disposed) return Promise.resolve()
     const task = this.tail.then(async () => {
@@ -162,10 +209,13 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     let response: Awaited<ReturnType<SettingsFace['settings']['describe']>>
     try {
       response = await this.api.settings.describe({})
-    } catch (_settingsReadFailure) {
+    } catch (settingsReadFailure) {
+      // A fence refusal settles a probe scope into memory mode; anything else
+      // is transient and the scope stays loading for a later retry.
+      if (isFenceRefusal(settingsReadFailure)) this.downgrade()
       return
     }
-    if (!response.result.ok || this.disposed) return
+    if (!response.result.ok || this.disposed || this.persistence === 'memory') return
     const { namespaces, writable } = response.result.value
     const view = namespaces.find(candidate => candidate.ns === this.spec.namespace)
     const publish = generation === this.readGeneration
@@ -182,6 +232,7 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
   }
 
   private accept(view: SettingsNamespaceView, publish: boolean, writable?: boolean): void {
+    if (this.persistence === 'memory') return
     const decoded = publish ? this.decode(view) : undefined
     this.store.update((draft) => {
       draft.revision = view.revision
@@ -239,6 +290,10 @@ export class SettingsScopeBinder extends Service {
    * Listeners exist before the initial background read starts, so activation
    * never blocks on the settings transport. The caller injects `connection`
    * for the transport and `remote` for the forwarded settings invalidation.
+   * Non-loopback pages bind a probe scope: Host persistence is attempted and
+   * the scope downgrades to process-local memory mode when the trust fence
+   * refuses, so LAN/ZeroTier deployments that trust their pages persist
+   * preferences exactly like loopback.
    * @param spec - domain-owned namespace contract.
    * @returns the bound scope consumed by the domain's services and rows.
    */
@@ -248,7 +303,7 @@ export class SettingsScopeBinder extends Service {
     const controller = new SettingsScopeController<T>(
       connection.api,
       spec,
-      connection.isLoopback ? 'host' : 'memory',
+      connection.isLoopback ? 'host' : 'probe',
     )
     ctx.effect(() => {
       const refresh = (namespace?: string): void => {

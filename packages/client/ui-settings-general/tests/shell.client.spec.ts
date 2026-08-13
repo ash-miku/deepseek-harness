@@ -17,9 +17,16 @@ async function bench() {
     getSnapshot: () => ({ active: 'zh', locales: [], revision: 0 }),
     subscribe: () => () => {},
   } as never)
+  const description = { version: 'test', cwd: '/tmp', attachedSessions: 0, canOpenPath: true }
   ctx.provide('connection', {
     api: { settings: { describe: async () => ({ result: { ok: false } }) } },
     isLoopback: false,
+    // A settled connection: the host.describe riding the /api fence has
+    // already succeeded, which proves this page is fence-accepted.
+    hostDescription: {
+      getSnapshot: () => description,
+      subscribe: () => () => {},
+    },
   } as never)
   ctx.provide('remote', { $on: () => () => {} } as never)
   return { ctx, slots: ctx.get('slots') as SlotRegistry }
@@ -139,6 +146,41 @@ describe('ui-settings apply', () => {
     for (const name of Object.keys(CHILD_SPECS) as Array<keyof typeof CHILD_SPECS>) {
       expect(b.slots.spec(name)).toEqual(CHILD_SPECS[name])
     }
+  })
+
+  it('registers the local-document action only once the trust fence accepted the page', async () => {
+    // Pre-connect page: the fence verdict is unknown, so the action stays off.
+    let description: unknown = undefined
+    const listeners = new Set<() => void>()
+    const ctx = new Context()
+    await ctx.plugin(SlotRegistry).await()
+    ctx.provide('locale', {
+      register: () => () => {},
+      bind: () => (key: string) => key,
+      getSnapshot: () => ({ active: 'zh', locales: [], revision: 0 }),
+      subscribe: () => () => {},
+    } as never)
+    ctx.provide('connection', {
+      api: { settings: { describe: async () => ({ result: { ok: false } }) } },
+      isLoopback: false,
+      hostDescription: {
+        getSnapshot: () => description,
+        subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+      },
+    } as never)
+    ctx.provide('remote', { $on: () => () => {} } as never)
+    const slots = ctx.get('slots') as SlotRegistry
+    declare(slots)
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    expect(slots.entries('settings.action')).toHaveLength(0)
+    // The connection settles (host.describe succeeded — the fence accepted
+    // this LAN page): the action registers for the LAN page too.
+    description = { version: 'test', cwd: '/tmp', attachedSessions: 0, canOpenPath: true }
+    for (const listener of listeners) listener()
+    expect(slots.entries('settings.action')).toHaveLength(1)
+    await fiber.dispose()
+    expect(slots.entries('settings.action')).toHaveLength(0)
   })
 
   it('unregisters the shell and collapses every child slot on teardown', async () => {
