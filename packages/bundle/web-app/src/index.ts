@@ -163,9 +163,11 @@ export function apply(ctx: Context, config: Config): void {
     // settlement first; a hand-built tree without a Loader prints at once.
     const printUrl = (): void => {
       // Reuse the exact LAN snapshot provided to the /api trust fence.
-      const lanCandidate = runtime.lanAddresses[0]
       const port = ctx.webServer.port
-      console.log(`dsh web: ${localWebUrl(ctx)}${lanCandidate === undefined ? '' : ` (LAN: http://${lanCandidate}:${String(port)})`}`)
+      const lanUrls = runtime.lanAddresses
+        .map(address => `http://${address}:${String(port)}`)
+        .join(', ')
+      console.log(`dsh web: ${localWebUrl(ctx)}${lanUrls.length === 0 ? '' : ` (LAN: ${lanUrls})`}`)
     }
     // This row's own activation can precede a sibling failure. The app owns
     // readiness by waiting for its Loader tree, or prints at once in a

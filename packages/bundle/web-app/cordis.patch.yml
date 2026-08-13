@@ -110,13 +110,15 @@
     # ── layer 2: transport/service ──────────────────────────────────────────────
 
     # Plain route-registration carrier; host and port come from the app's
-    # webStartup provider, with these deployment fallbacks. The dist is served by
-    # the web-runtime row below through the fallback seat.
+    # webStartup provider, with these deployment fallbacks. The default
+    # all-interfaces bind serves the browser UI to the LAN and to ZeroTier
+    # routes; the dist is served by the web-runtime row below through the
+    # fallback seat.
     - id: webserver
       name: '@deepseek-ai/dsh-host-webserver'
       inject: [webStartup]
       config:
-        host: !!js ctx.webStartup.host ?? '127.0.0.1'
+        host: !!js ctx.webStartup.host ?? '0.0.0.0'
         port: !!js ctx.webStartup.port ?? 3080
 
     # Web glue owned by this bundle: resolves the built frontend dist (an

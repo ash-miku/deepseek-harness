@@ -68,25 +68,15 @@ export const Config: z<ConnectionConfig> = z.object({
 
 /**
  * Methods gated to loopback even on a trusted-host deployment. Native dialogs
- * act on the host machine; the settings and credential domains mutate the
- * user's configuration and secret store, and READING them is equally
- * privileged — `settings.describe` returns every exposed namespace's
- * configuration and `credentials.describe` reports whether an arbitrary
- * environment-variable name is configured and where from, which is
- * reconnaissance no anonymous caller should have. `trustedHosts` is a
- * DNS-rebinding fence, explicitly not authentication, so the whole
- * configuration plane stays loopback-same-origin until a real authentication
- * layer exists. `llm.discoverModels` belongs to that plane on both counts: it
- * carries a draft credential, and it makes the HOST issue a GET to a URL the
- * caller chose and reports back the status or the parsed body — an anonymous
- * LAN caller would have a probe for whatever the host can reach and the
- * browser cannot.
- *
- * The model catalog (`llm.providers`, `llm.models`) is deliberately NOT here:
- * it carries provider ids, display names, and model lists — no endpoints,
- * keys, or key state — and a LAN client's model picker legitimately needs it.
+ * act on the host machine, and the agent-preset management plane changes the
+ * runtime composition or drives the host desktop. The settings, credential,
+ * and model-discovery plane is intentionally NOT here: the web profile derives
+ * its LAN IP literals as trusted authorities, so a LAN browser's settings page
+ * can read and configure the deployment it is connected to. `trustedHosts` is
+ * a DNS-rebinding fence, not an authentication layer, so exposing it beyond a
+ * trusted network still requires a real auth layer in front of this server.
  */
-const PRIVILEGED_METHODS = new Set([
+const LOOPBACK_ONLY_METHODS = new Set([
   // A preset composition names the plugins a session runs, so reading one is
   // reconnaissance; copy and remove rearrange what the deployment offers, and
   // openDocument drives the host desktop — all more than the roster beside
@@ -107,22 +97,13 @@ const PRIVILEGED_METHODS = new Set([
   'agentPreset.remove',
   'host.pickDirectory',
   'host.openPath',
-  'settings.describe',
-  'settings.openDocument',
-  'settings.update',
-  'settings.replace',
-  'settings.mutate',
-  'credentials.describe',
-  'credentials.set',
-  'credentials.unset',
-  'llm.discoverModels',
 ])
 
 /**
  * Mounts the API gateway under the browser transport prefix. Every request on
  * the prefix passes the browser-trust fence first (DNS-rebinding and
  * cross-site defense — [api-request-trust](./api-request-trust.ts));
- * privileged methods additionally pass it with an empty trust list, which
+ * loopback-only methods additionally pass it with an empty trust list, which
  * pins them to loopback.
  * @param ctx - Host plugin context.
  * @param config - resolved plugin config (schema defaults applied).
@@ -143,7 +124,7 @@ export function apply(ctx: Context, config?: ConnectionConfig): void {
         ? pathname.slice(API_PATH.length + 1)
         : undefined
       if (method !== undefined
-        && PRIVILEGED_METHODS.has(method)
+        && LOOPBACK_ONLY_METHODS.has(method)
         && !isTrustedApiRequest(request, [])) {
         return new Response('forbidden', { status: 403 })
       }

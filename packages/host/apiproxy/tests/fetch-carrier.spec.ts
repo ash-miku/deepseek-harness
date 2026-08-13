@@ -307,6 +307,21 @@ async function collect<F>(stream: AsyncIterable<RpcRequest<F>>): Promise<RpcRequ
   return out
 }
 
+/** Client probe that captures the minted id while still answering fetch. */
+class MintTrackingClient extends AbstractApiClient {
+  lastMinted = ''
+
+  protected async doFetch(_input: URL): Promise<Response> {
+    return Response.json({ type: 'server-response', rpcId: this.lastMinted, result: { ok: true, value: { items: [] } } })
+  }
+
+  protected override mintRpcId(): ReturnType<AbstractApiClient['mintRpcId']> {
+    const id = super.mintRpcId()
+    this.lastMinted = id
+    return id
+  }
+}
+
 describe('unary round trip (handler ⇄ client, no network)', () => {
   it('carries a success result and echoes the minted rpcId', async () => {
     const response = await client().sessions.list({})
@@ -770,18 +785,11 @@ describe('envelope observation', () => {
 
 describe('resolveBase', () => {
   it('prefers a real location.origin and falls back to the internal authority', async () => {
-    class Probe extends AbstractApiClient {
+    class Probe extends MintTrackingClient {
       urls: string[] = []
-      protected async doFetch(input: URL): Promise<Response> {
+      protected override async doFetch(input: URL): Promise<Response> {
         this.urls.push(input.href)
-        return Response.json({ type: 'server-response', rpcId: this.lastMinted, result: { ok: true, value: { items: [] } } })
-      }
-
-      lastMinted = ''
-      protected override mintRpcId(): ReturnType<AbstractApiClient['mintRpcId']> {
-        const id = super.mintRpcId()
-        this.lastMinted = id
-        return id
+        return super.doFetch(input)
       }
     }
     const probe = new Probe()
@@ -800,6 +808,24 @@ describe('resolveBase', () => {
       expect(probe3.urls[0]).toMatch(/^http:\/\/dsh\.internal\//)
     } finally {
       delete globalWithLocation.location
+    }
+  })
+})
+
+describe('mintRpcId', () => {
+  it('mints request ids without requiring secure-context crypto.randomUUID', async () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues(bytes: Uint8Array) {
+        return bytes.fill(0)
+      },
+    })
+    class Probe extends MintTrackingClient {}
+    try {
+      const probe = new Probe()
+      await probe.sessions.list({})
+      expect(probe.lastMinted).toBe('00000000-0000-4000-8000-000000000000')
+    } finally {
+      vi.unstubAllGlobals()
     }
   })
 })

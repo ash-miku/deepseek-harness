@@ -38,7 +38,7 @@ interface Config {
 }
 ```
 
-`host` accepts only `127.0.0.1` (default posture) and `0.0.0.0` (deliberate network exposure); there is no TLS, auth, or origin policy, so a non-loopback bind exposes the server to that network. The dist location is an assembly fact of the frontend plugin that claims the seat.
+`host` accepts `127.0.0.1` (loopback only) and `0.0.0.0` (all interfaces); the web profile defaults to `0.0.0.0` and the browser-trust fence samples LAN IPv4 literals for that bind. There is no TLS, auth, or origin policy beyond that trust fence, so an all-interfaces bind exposes the server to reachable networks. The dist location is an assembly fact of the frontend plugin that claims the seat.
 
 ## The service
 

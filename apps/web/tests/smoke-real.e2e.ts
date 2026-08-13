@@ -154,7 +154,7 @@ const notReady = UI_PLUGIN_DIRS.filter((dir) => {
 if (notReady.length > 0) console.warn(`[smoke-real] skipped — client bundles not ready: ${notReady.join(', ')}`)
 
 describe('dsh web keyless CLI smoke', () => {
-  it('listens on 127.0.0.1 by default', async () => {
+  it('serves the loopback URL while listening on all interfaces by default', async () => {
     requireDist()
     const sessionsDir = mkdtempSync(join(tmpdir(), 'dsh-web-keyless-'))
     const tsxLoader = pathToFileURL(createRequire(join(REPO_ROOT, 'package.json')).resolve('tsx')).href
@@ -488,8 +488,8 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY || notReady.length > 0)('web smoke
         '--import', tsxLoader, join(REPO_ROOT, 'apps/cli/src/bin.ts'), 'web',
         // Launcher flags come first: the first token the launcher does not own
         // starts the web app's own arguments.
-        // Pin the in-browser picker: the shipped `-auto` row would resolve to
-        // the native OS chooser on this bind, and no page can drive that.
+        // Pin the in-browser picker: the shipped `-auto` row may resolve to
+        // the native OS chooser on a loopback bind, and no page can drive that.
         '--patch', fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
         '--port', String(port),
       ],

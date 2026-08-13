@@ -42,7 +42,7 @@ export function apply(ctx: Context): void {
   name: '@deepseek-ai/dsh-host-webserver'
   inject: [webStartup]
   config:
-    host: !!js ctx.webStartup.host ?? '127.0.0.1'
+    host: !!js ctx.webStartup.host ?? '0.0.0.0'
     port: !!js ctx.webStartup.port ?? 3080
 ```
 

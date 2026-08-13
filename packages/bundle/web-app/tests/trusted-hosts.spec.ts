@@ -15,6 +15,9 @@ vi.mock('node:os', () => ({
     en1: [
       { family: 'IPv4', internal: false, address: '10.0.0.7' },
     ],
+    zt0: [
+      { family: 'IPv4', internal: false, address: '192.168.192.30' },
+    ],
     utun0: undefined,
   }),
 }))
@@ -22,8 +25,8 @@ vi.mock('node:os', () => ({
 describe('resolveLanTrust', () => {
   it('samples non-internal IPv4 addresses once for an all-interfaces bind: trust and display share them', () => {
     const { lanAddresses, trustedHosts } = resolveLanTrust('0.0.0.0', ['harness.internal:3080'])
-    expect(lanAddresses).toEqual(['192.168.1.5', '10.0.0.7'])
-    expect(trustedHosts).toEqual(['192.168.1.5', '10.0.0.7', 'harness.internal:3080'])
+    expect(lanAddresses).toEqual(['192.168.1.5', '10.0.0.7', '192.168.192.30'])
+    expect(trustedHosts).toEqual(['192.168.1.5', '10.0.0.7', '192.168.192.30', 'harness.internal:3080'])
   })
 
   it('derives nothing for a loopback bind — extras alone stand, no LAN URL to print', () => {

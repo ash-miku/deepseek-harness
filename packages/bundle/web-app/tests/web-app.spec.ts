@@ -19,6 +19,7 @@ vi.mock('node:os', async importOriginal => ({
   networkInterfaces: () => ({
     lo0: [{ family: 'IPv4', internal: true, address: '127.0.0.1' }],
     en0: [{ family: 'IPv4', internal: false, address: '192.168.1.5' }],
+    zt0: [{ family: 'IPv4', internal: false, address: '192.168.192.20' }],
   }),
 }))
 
@@ -91,10 +92,12 @@ describe('web-app runtime glue', () => {
 
     expect(seat()).toBeDefined() // frontend-static claimed the fallback
     expect(ctx.get('webRuntime')).toEqual({
-      lanAddresses: ['192.168.1.5'],
-      trustedHosts: ['192.168.1.5', 'lab.internal'],
+      lanAddresses: ['192.168.1.5', '192.168.192.20'],
+      trustedHosts: ['192.168.1.5', '192.168.192.20', 'lab.internal'],
     })
-    expect(log).toHaveBeenCalledWith('dsh web: http://127.0.0.1:4567 (LAN: http://192.168.1.5:4567)')
+    expect(log).toHaveBeenCalledWith(
+      'dsh web: http://127.0.0.1:4567 (LAN: http://192.168.1.5:4567, http://192.168.192.20:4567)',
+    )
     const assembly = await ctx.systemPrompt.assemble()
     expect(assembly.sections.find(entry => entry.name === 'harness:source')?.text).toContain('DeepSeek Harness implementation checkout')
     const section = assembly.sections.find(entry => entry.name === 'app:web-surface')
