@@ -13,6 +13,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as themeApply, inject as themeInject, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { apply, inject, LayoutController } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { FONT_SCALE_ATTRIBUTE } from '@deepseek-ai/dsh-client-ui-layout/src/client/theme-presenter.ts'
 import { apply as nodeApply } from '@deepseek-ai/dsh-client-ui-layout'
 import * as invariant from '@deepseek-ai/dsh-client-ui-layout/invariant'
 
@@ -74,6 +75,7 @@ describe('ui-layout client apply', () => {
     // Initial getter application: jsdom has no matchMedia, system resolves light.
     expect(document.documentElement.style.colorScheme).toBe('light')
     expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(false)
+    expect(document.body.getAttribute(FONT_SCALE_ATTRIBUTE)).toBe('normal')
     const themeColorMeta = document.head.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     expect(themeColorMeta).not.toBeNull()
     const theme = ctx.get('theme') as ThemeRuntime
@@ -81,9 +83,12 @@ describe('ui-layout client apply', () => {
     expect(document.documentElement.style.colorScheme).toBe('dark')
     expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(true)
     expect(document.head.querySelector('meta[name="theme-color"]')).toBe(themeColorMeta)
+    theme.setFontScale('large')
+    expect(document.body.getAttribute(FONT_SCALE_ATTRIBUTE)).toBe('large')
     await fiber.dispose()
     expect(document.documentElement.style.colorScheme).toBe('')
     expect(document.body.hasAttribute('data-ds-dark-theme')).toBe(false)
+    expect(document.body.hasAttribute(FONT_SCALE_ATTRIBUTE)).toBe(false)
     expect(themeColorMeta?.isConnected).toBe(false)
     // Listener is off: further theme changes no longer reach the document.
     theme.setTheme('light')

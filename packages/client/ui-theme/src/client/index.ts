@@ -20,14 +20,15 @@ import { AppearanceRow } from './AppearanceRow.tsx'
 import { createAppearanceRowStore } from './settings-store.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import {
-  DEFAULT_PREFERENCE, isThemePreference, THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
-  type ThemePreference, type ThemeSettings,
+  DEFAULT_FONT_SCALE, DEFAULT_PREFERENCE, FONT_SCALE_FIELD, FONT_SCALES, isFontScale, isThemePreference,
+  THEME_PREFERENCE_FIELD, THEME_SETTINGS_NAMESPACE,
+  type FontScalePreference, type ThemePreference, type ThemeSettings,
 } from '../theme-settings.ts'
 
 export type { AppearanceRowComponentProps, AppearanceRowInjected } from './AppearanceRow.tsx'
 export type { AppearanceRowState } from './settings-store.ts'
 export type { ThemeKey } from './locales.ts'
-export type { ThemePreference, ThemeSettings } from '../theme-settings.ts'
+export type { FontScalePreference, ThemePreference, ThemeSettings } from '../theme-settings.ts'
 
 /** Namespace owning this feature's settings-row copy. */
 export const SETTINGS_NS = 'settings.theme'
@@ -74,6 +75,8 @@ export interface ThemeDefinition {
 export interface ThemeSnapshot {
   /** The persisted preference (may be `system`). */
   preference: ThemePreference
+  /** The persisted font scale. */
+  fontScale: FontScalePreference
   /**
    * The resolved active theme (`system` resolved via prefers-color-scheme)
    * with override layers folded into its tokens (seq order, later layers win
@@ -152,6 +155,7 @@ export class ThemeRuntime {
   private readonly host: SettingsScope<ThemeSettings>
   private themes: ThemeDefinition[] = [...BUILTIN_THEMES]
   private preference: ThemePreference
+  private fontScale: FontScalePreference = DEFAULT_FONT_SCALE
   private revision = 0
   private snapshot: ThemeSnapshot
   private readonly media: MediaQueryList | undefined
@@ -168,6 +172,7 @@ export class ThemeRuntime {
     this.ctx = ctx
     this.host = host
     this.preference = DEFAULT_PREFERENCE
+    this.fontScale = DEFAULT_FONT_SCALE
     // Non-browser runs (node e2e booting the client tree) have no matchMedia.
     this.media = typeof matchMedia === 'undefined' ? undefined : matchMedia('(prefers-color-scheme: dark)')
     this.snapshot = this.buildSnapshot()
@@ -229,11 +234,30 @@ export class ThemeRuntime {
     this.publish()
   }
 
-  /** Adopt the scope's accepted durable preference without writing it back. */
+  /**
+   * Switch the persisted font scale.
+   * @param id - a built-in font scale; unknown ids throw.
+   */
+  setFontScale(id: string): void {
+    if (!FONT_SCALES.includes(id as FontScalePreference)) {
+      throw new Error(`font scale "${id}" is not supported`)
+    }
+    if (this.fontScale === id) return
+    this.fontScale = id as FontScalePreference
+    void this.host.set(FONT_SCALE_FIELD, id)
+    this.publish()
+  }
+
+  /** Adopt the scope's accepted durable preferences without writing them back. */
   private adopt(): void {
     const section = this.host.getSnapshot().value
-    if (section === undefined || this.preference === section.preference) return
-    this.preference = section.preference
+    if (section === undefined) return
+    const fontScale = section.fontScale ?? DEFAULT_FONT_SCALE
+    const preferenceChanged = this.preference !== section.preference
+    const fontScaleChanged = this.fontScale !== fontScale
+    if (!preferenceChanged && !fontScaleChanged) return
+    if (preferenceChanged) this.preference = section.preference
+    if (fontScaleChanged && isFontScale(fontScale)) this.fontScale = fontScale
     this.publish()
   }
 
@@ -300,6 +324,7 @@ export class ThemeRuntime {
     if (active === undefined) throw new Error(`theme registry lost "${resolvedId}"`)
     return Object.freeze({
       preference: this.preference,
+      fontScale: this.fontScale,
       active: this.composeActive(active),
       themes: Object.freeze([...this.themes]),
       revision: this.revision,
@@ -391,7 +416,7 @@ export function apply(ctx: ClientContext): void {
   const store = createAppearanceRowStore()
   let bound: BoundActions<typeof store> | undefined
   const sync = (snapshot: ThemeSnapshot): void => {
-    bound?.sync(snapshot.preference, snapshot.revision)
+    bound?.sync(snapshot.preference, snapshot.fontScale, snapshot.revision)
   }
   ctx.on('theme/change', sync)
   const injected = (actions: BoundActions<typeof store>): AppearanceRowInjected => {
@@ -401,6 +426,7 @@ export function apply(ctx: ClientContext): void {
     sync(theme.getTheme())
     return {
       setTheme: (id) => { theme.setTheme(id) },
+      setFontScale: (id) => { theme.setFontScale(id) },
     }
   }
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({

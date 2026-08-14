@@ -23,6 +23,13 @@
   flex-wrap: wrap;
 }
 
+.fontScaleRow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* Appearance cube (figma '.Selector Cube' 276x82 r16, pad 20/32, centered
  * icon-over-label column, gap 4); flexed down from the figma width so all
  * three sit on one row in the 800 panel, wrapping when narrower. */
@@ -46,6 +53,30 @@
 }
 
 .themeCube:hover:not(.selected) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* Compact font-scale chip: same selected language as the theme cube but in
+   the 32px control rhythm used by the rest of the settings surface. */
+.fontScaleChip {
+  box-sizing: border-box;
+  flex: 1 1 96px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.fontScaleChip:hover:not(.selected) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 

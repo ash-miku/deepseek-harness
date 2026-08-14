@@ -1,20 +1,27 @@
 // @vitest-environment jsdom
 // ThemePresenter behavior account: root color-scheme and the palette attribute
-// follow active.colorScheme only, token variables replace the previous apply's
-// set, theme-color metadata follows the rendered body background, and dispose
-// retracts everything the presenter wrote.
+// follow active.colorScheme only, font scale follows the persisted snapshot,
+// token variables replace the previous apply's set, theme-color metadata
+// follows the rendered body background, and dispose retracts everything the
+// presenter wrote.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
-import { DARK_ATTRIBUTE, ThemePresenter } from '@deepseek-ai/dsh-client-ui-layout/src/client/theme-presenter.ts'
+import {
+  DARK_ATTRIBUTE, FONT_SCALE_ATTRIBUTE, ThemePresenter,
+} from '@deepseek-ai/dsh-client-ui-layout/src/client/theme-presenter.ts'
 
 const LIGHT_THEME_COLOR = 'rgb(255, 255, 255)'
 const DARK_THEME_COLOR = 'rgb(21, 21, 23)'
 
-function snapshot(colorScheme: 'light' | 'dark', tokens: Record<string, string> = {}): ThemeSnapshot {
+function snapshot(
+  colorScheme: 'light' | 'dark',
+  tokens: Record<string, string> = {},
+  fontScale: ThemeSnapshot['fontScale'] = 'normal',
+): ThemeSnapshot {
   // The presenter must key off colorScheme, not the id — keep them distinct.
   const active = { id: `${colorScheme}-test`, colorScheme, tokens }
-  return { preference: colorScheme, active, themes: [active], revision: 1 }
+  return { preference: colorScheme, fontScale, active, themes: [active], revision: 1 }
 }
 
 function clearThemePresentation(): void {
@@ -29,6 +36,7 @@ beforeEach(() => {
   clearThemePresentation()
   document.documentElement.style.removeProperty('color-scheme')
   document.body.removeAttribute(DARK_ATTRIBUTE)
+  document.body.removeAttribute(FONT_SCALE_ATTRIBUTE)
   document.body.removeAttribute('style')
   const style = document.createElement('style')
   style.dataset.themePresenterTest = ''
@@ -47,6 +55,7 @@ describe('ThemePresenter', () => {
     presenter.apply(snapshot('light'))
     expect(document.documentElement.style.colorScheme).toBe('light')
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(false)
+    expect(document.body.getAttribute(FONT_SCALE_ATTRIBUTE)).toBe('normal')
     expect(themeColorMeta()?.content).toBe(LIGHT_THEME_COLOR)
   })
 
@@ -65,6 +74,14 @@ describe('ThemePresenter', () => {
     expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1)
   })
 
+  it('projects the persisted font scale onto the body and updates on change', () => {
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('dark', {}, 'small'))
+    expect(document.body.getAttribute(FONT_SCALE_ATTRIBUTE)).toBe('small')
+    presenter.apply(snapshot('dark', {}, 'xlarge'))
+    expect(document.body.getAttribute(FONT_SCALE_ATTRIBUTE)).toBe('xlarge')
+  })
+
   it('applies tokens as inline variables and clears the previous set on theme change', () => {
     const presenter = new ThemePresenter()
     presenter.apply(snapshot('dark', { '--dsw-alias-bg': '#111', '--dsw-alias-fg': '#eee' }))
@@ -76,14 +93,15 @@ describe('ThemePresenter', () => {
     expect(document.body.style.getPropertyValue('--dsw-alias-fg')).toBe('')
   })
 
-  it('dispose removes color-scheme, the attribute, and every applied variable, sparing foreign inline styles', () => {
+  it('dispose removes color-scheme, the attributes, and every applied variable, sparing foreign inline styles', () => {
     document.body.style.setProperty('--foreign', 'kept')
     const presenter = new ThemePresenter()
-    presenter.apply(snapshot('dark', { '--dsw-alias-bg': '#111' }))
+    presenter.apply(snapshot('dark', { '--dsw-alias-bg': '#111' }, 'large'))
     const meta = themeColorMeta()
     presenter.dispose()
     expect(document.documentElement.style.colorScheme).toBe('')
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(false)
+    expect(document.body.hasAttribute(FONT_SCALE_ATTRIBUTE)).toBe(false)
     expect(document.body.style.getPropertyValue('--dsw-alias-bg')).toBe('')
     expect(document.body.style.getPropertyValue('--foreign')).toBe('kept')
     expect(meta?.isConnected).toBe(false)

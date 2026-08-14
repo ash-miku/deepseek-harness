@@ -6,6 +6,7 @@
 @import '@deepseek-ai/dsh-client-ui-theme/styles/design-platform.css';
 @import '@deepseek-ai/dsh-client-ui-theme/styles/scrollbar.css';
 @import '@deepseek-ai/dsh-client-ui-theme/styles/gradient-shadow-text.css';
+@import '@deepseek-ai/dsh-client-ui-theme/styles/font-scale.css';
 @import '@deepseek-ai/dsh-client-ui-theme/styles/shiki.css';
 
 html,

@@ -26,6 +26,7 @@ describe('ThemeRuntime', () => {
     const { theme } = make()
     const snapshot = theme.getTheme()
     expect(snapshot.preference).toBe('system')
+    expect(snapshot.fontScale).toBe('normal')
     // jsdom matchMedia is absent; system resolves to light.
     expect(snapshot.active.id).toBe('light')
     expect(snapshot.active.colorScheme).toBe('light')
@@ -48,21 +49,35 @@ describe('ThemeRuntime', () => {
     expect(host.set).toHaveBeenCalledOnce()
   })
 
+  it('setFontScale switches, writes through the scope, and republishes', () => {
+    const { theme, events, host } = make()
+    theme.setFontScale('large')
+    expect(theme.getTheme().fontScale).toBe('large')
+    expect(host.set).toHaveBeenCalledWith('fontScale', 'large')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toBe(theme.getTheme())
+    theme.setFontScale('large')
+    expect(events).toHaveLength(1)
+    expect(host.set).toHaveBeenCalledOnce()
+    expect(() => theme.setFontScale('huge')).toThrow('not supported')
+  })
+
   it('adopts a published Host section without writing it back', () => {
     const { theme, events, host } = make()
-    host.publish({ status: 'ready', value: { preference: 'dark' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'dark', fontScale: 'normal' }, revision: 1, writable: true })
     expect(theme.getTheme().preference).toBe('dark')
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { preference: 'dark' }, revision: 2 })
+    host.publish({ value: { preference: 'dark', fontScale: 'normal' }, revision: 2 })
     expect(events).toHaveLength(1)
   })
 
   it('adopts a section already standing at construction', () => {
     const host = stubSettingsScope<ThemeSettings>()
-    host.publish({ status: 'ready', value: { preference: 'dark' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'dark', fontScale: 'xlarge' }, revision: 1, writable: true })
     const { theme } = make(host)
     expect(theme.getTheme().preference).toBe('dark')
+    expect(theme.getTheme().fontScale).toBe('xlarge')
   })
 
   it('throws on unknown setTheme ids, duplicate registration, and the system id', () => {
