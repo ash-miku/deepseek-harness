@@ -294,26 +294,72 @@ describe('AppFrame — narrow-viewport auto-collapse', () => {
     expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
   })
 
-  it('narrow toggle re-expands over the squeezed center and back', () => {
+  it('narrow toggle opens a drawer over the full-width center and back', () => {
     frameWidth = 980
-    const { frame, instance } = mountFrame()
+    const { frame, instance, slotCalls } = mountFrame()
     act(() => { instance.actions.toggleSidebar() })
-    expect(tracks(frame)).toEqual([280, 0])
+    // The expanded sidebar overlays the center: grid track 0, no squeeze.
+    expect(tracks(frame)).toEqual([0, 0])
     expect(frame.hasAttribute('data-sidebar-collapsed')).toBe(false)
-    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
+    expect(frame.hasAttribute('data-narrow-drawer')).toBe(true)
+    // The drawer renders wide content at the contract default width.
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: false, width: 280 })
+    // No drag handles while narrow (drawer width is the stored preference).
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
     act(() => { instance.actions.toggleSidebar() })
     expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(frame.hasAttribute('data-narrow-drawer')).toBe(false)
   })
 
   it('a wide-closed preference re-expands at the contract default while narrow', () => {
     frameWidth = 1920
-    const { frame, instance } = mountFrame()
+    const { frame, instance, slotCalls } = mountFrame()
     act(() => { instance.actions.toggleSidebar() }) // close while wide: preference 0
     frameWidth = 980
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
     act(() => { instance.actions.toggleSidebar() })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: false, width: 280 })
     expect(instance.getSnapshot().sidebar).toBe(0) // preference untouched
+  })
+
+  it('drawer width is capped at the viewport (desktop drag width can exceed the phone screen)', () => {
+    frameWidth = 390
+    const { instance, slotCalls } = mountFrame()
+    act(() => { instance.actions.setSidebar(420) })
+    act(() => { instance.actions.toggleSidebar() })
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: false, width: 390 })
+  })
+
+  it('scrim click collapses the drawer', () => {
+    frameWidth = 980
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.toggleSidebar() })
+    expect(frame.hasAttribute('data-narrow-drawer')).toBe(true)
+    const scrim = frame.querySelector('[class*="scrim"]')!
+    act(() => { scrim.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(frame.hasAttribute('data-narrow-drawer')).toBe(false)
+  })
+
+  it('Escape collapses the drawer', () => {
+    frameWidth = 980
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.toggleSidebar() })
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+  })
+
+  it('Escape does nothing while the drawer is closed', () => {
+    frameWidth = 980
+    const { frame, instance } = mountFrame()
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(instance.getSnapshot().narrowExpanded).toBe(false)
   })
 
   it('shrinking across the breakpoint auto-collapses; re-widening restores the drag width', () => {

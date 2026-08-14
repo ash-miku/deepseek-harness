@@ -895,6 +895,23 @@ describe('registry-global session archive', () => {
     expect(result.registry.archivedSessionIds).toEqual(['gone', 'kept'])
   })
 
+  it('unarchives durably in archive order and idempotently skips absent ids', async () => {
+    const dir = await makeDir('unarchive-home')
+    const result = await harness({ sessions: [header('kept', dir, 100), header('gone', dir, 200)] })
+    await result.registry.archiveSession(SessionId('gone'))
+    await result.registry.archiveSession(SessionId('kept'))
+    expect(result.registry.archivedSessionIds).toEqual(['gone', 'kept'])
+
+    await result.registry.unarchiveSession(SessionId('kept'))
+    expect(result.registry.archivedSessionIds).toEqual(['gone'])
+    expect(storedState(result.pool).archivedSessionIds).toEqual(['gone'])
+    const changesAfterUnarchive = result.changes.filter(change => change.table === '').length
+
+    await result.registry.unarchiveSession(SessionId('ghost'))
+    expect(result.registry.archivedSessionIds).toEqual(['gone'])
+    expect(result.changes.filter(change => change.table === '').length).toBe(changesAfterUnarchive)
+  })
+
   it('accepts unaccounted and live sessions but rejects unknown ids without writing', async () => {
     const dir = await makeDir('archive-strays')
     const live = await makeDir('archive-live')

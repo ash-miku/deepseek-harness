@@ -7,7 +7,8 @@
 // flat "In one list" view with its persisted group-by preference, the session
 // hover card and row action menu, and the session archive round trip (row
 // menu → workspace.archiveSession RPC → durable global set → row hidden
-// across reload). Zero model calls: workspace.create/rename/archiveSession
+// across reload → archived bucket → workspace.unarchiveSession restores it).
+// Zero model calls: workspace.create/rename/archiveSession/unarchiveSession
 // are host RPCs with no model involvement, and the one session row the
 // flat/hover/menu/archive scenarios need comes from a seeded fixture (the
 // seeded-history seed reused verbatim — no new recording).
@@ -589,10 +590,24 @@ describe('web e2e: workspace management (create / rename / flat view / hover aff
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     await expect.poll(() => page.getByText('Workspaces', { exact: true }).count(), { timeout: 15_000 }).toBe(1)
-    // The archived row must not resurface (the Ungrouped bucket itself may
-    // reappear if selection restore lands on another stray — not this test's
-    // concern).
+    // The archived row must not resurface in ordinary groups (the Ungrouped
+    // bucket itself may reappear if selection restore lands on another stray
+    // — not this test's concern). The archived bucket is folded, so the row is
+    // still not visible until the user opens it.
     expect(await page.getByText(rowTitle, { exact: true }).count()).toBe(0)
+
+    // Open the archived bucket and restore the session from its row menu. The
+    // workspace accounting slot remains, so it returns to Ungrouped.
+    const archivedHeader = page.getByText('Archived', { exact: true })
+    await expect.poll(() => archivedHeader.count(), { timeout: 10_000 }).toBe(1)
+    await archivedHeader.click()
+    const archivedRow = page.locator('[role="treeitem"]')
+      .filter({ has: page.locator(`button[aria-label="Session actions for ${rowTitle}"]`) })
+    await expect.poll(() => archivedRow.count(), { timeout: 10_000 }).toBe(1)
+    await clickHoverAction(archivedRow.first(), `Session actions for ${rowTitle}`)
+    await page.getByRole('menuitem', { name: 'Unarchive session' }).click()
+    await expect.poll(() => page.getByText(rowTitle, { exact: true }).count(), { timeout: 10_000 }).toBe(1)
+    await expect.poll(() => [...scaffold.ctx.workspaceRegistry.archivedSessionIds], { timeout: 10_000 }).toEqual([])
     expect(tripwire.pageErrors).toEqual([])
   }, 90_000)
 

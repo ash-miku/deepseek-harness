@@ -551,11 +551,21 @@ describe('Host Workspace increments', () => {
     expect(listed.items[0]?.sessionIds).toEqual([sessionId])
     expect(expectOk(await api.sessions.list(request({}))).items.map(item => item.sessionId)).toContain(sessionId)
 
-    // The idempotent repeat emits no second frame: the next observed frame is
-    // the workspace-changed of a later attach, not another archive snapshot.
-    const after = nextHostFrame(stream)
+    // The idempotent repeat emits no second frame. Restore in this clean
+    // window so the next host frame is exactly the archive-set snapshot.
     expect(expectOk(await api.workspace.archiveSession(request({ sessionId }))).archivedSessionIds)
       .toEqual([sessionId])
+    const restored = nextHostFrame(stream)
+    expect(expectOk(await api.workspace.unarchiveSession(request({ sessionId }))).archivedSessionIds)
+      .toEqual([])
+    expect(await restored).toMatchObject({
+      payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [] },
+    })
+    expect(expectOk(await api.workspace.list(request({}))).archivedSessionIds).toEqual([])
+    expect(expectOk(await api.workspace.list(request({}))).items[0]?.sessionIds).toEqual([sessionId])
+    expect(expectOk(await api.sessions.list(request({}))).items.map(item => item.sessionId)).toContain(sessionId)
+
+    const after = nextHostFrame(stream)
     const otherSession = SessionId('session-after-archive')
     expectOk(await api.sessions.create(request({ workspaceId: workspace.workspaceId, sessionId: otherSession })))
     expect((await after).payload.type).not.toBe('host/archived-sessions-changed')

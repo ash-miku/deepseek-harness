@@ -269,6 +269,77 @@ describe('model list editing', () => {
     expect(mutate).not.toHaveBeenCalled()
   })
 
+  it('declares per-model thinking levels with their wire spellings', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'think' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    fireEvent.change(screen.getByLabelText(`${en.reasoningEfforts} 1`), { target: { value: 'declared' } })
+    // Declaring opens with the pair most OpenAI-compatible gateways accept.
+    expect(screen.getByLabelText<HTMLInputElement>(`${en.reasoningLevel} Off 1`).checked).toBe(true)
+    expect(screen.getByLabelText<HTMLInputElement>(`${en.reasoningLevel} High 1`).checked).toBe(true)
+    fireEvent.change(screen.getByLabelText(`${en.reasoningWire} High 1`), { target: { value: 'ultra' } })
+    fireEvent.click(screen.getByLabelText(`${en.reasoningLevel} Low 1`))
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([
+      { id: 'think', reasoningEfforts: { off: null, high: 'ultra', low: 'low' } },
+    ])
+  })
+
+  it('reads an existing thinking-level declaration and clears it back to default', async () => {
+    const { mutate } = await mountSection({
+      providers: {
+        openai: {
+          baseURL: 'https://proxy.example/v1',
+          models: [{ id: 'think', reasoningEfforts: { off: null, high: 'ultra' } }],
+        },
+      },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    expect(screen.getByLabelText<HTMLSelectElement>(`${en.reasoningEfforts} 1`).value).toBe('declared')
+    expect(screen.getByLabelText<HTMLInputElement>(`${en.reasoningWire} High 1`).value).toBe('ultra')
+    fireEvent.change(screen.getByLabelText(`${en.reasoningEfforts} 1`), { target: { value: 'inherit' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'think' }])
+  })
+
+  it('writes false when a model is declared non-reasoning', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'think' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    fireEvent.change(screen.getByLabelText(`${en.reasoningEfforts} 1`), { target: { value: 'none' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'think', reasoningEfforts: false }])
+  })
+
+  it('refuses a thinking-level declaration with no level beyond Off', async () => {
+    const { mutate } = await mountSection({
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'think' }] } },
+    })
+    openEditor('openai')
+    expandModel(1)
+
+    fireEvent.change(screen.getByLabelText(`${en.reasoningEfforts} 1`), { target: { value: 'declared' } })
+    fireEvent.click(screen.getByLabelText(`${en.reasoningLevel} High 1`))
+
+    expect(screen.getByText(`${en.model} 1: ${en.modelReasoningInvalid}`)).toBeTruthy()
+    expect(buttonNamed(en.apply).disabled).toBe(true)
+    expect(mutate).not.toHaveBeenCalled()
+  })
+
   it('spells a stored capacity back the way it is typed', async () => {
     await mountSection({
       providers: {
@@ -1375,5 +1446,29 @@ describe('API key field', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     await waitFor(() => { expect(load).toHaveBeenCalledOnce() })
     expect(screen.queryByText(en.customTitle)).toBeNull()
+  })
+
+  it('writes per-model thinking levels when creating a hand-declared provider', async () => {
+    const { mutate } = await mountSection()
+
+    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
+    fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: 'https://acme.test/v1' } })
+    fireEvent.click(screen.getByRole('button', { name: en.addModel }))
+    fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'think' } })
+    expandModel(1)
+    fireEvent.change(screen.getByLabelText(`${en.reasoningEfforts} 1`), { target: { value: 'declared' } })
+    fireEvent.click(screen.getByText(en.create))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]).toMatchObject({
+      op: 'set',
+      path: ['providers', 'acme'],
+      value: {
+        api: 'openai-completions',
+        baseURL: 'https://acme.test/v1',
+        models: [{ id: 'think', reasoningEfforts: { off: null, high: 'high' } }],
+      },
+    })
   })
 })

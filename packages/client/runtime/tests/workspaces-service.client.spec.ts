@@ -488,6 +488,34 @@ describe('WorkspaceRuntime', () => {
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-open'])
   })
 
+  it('unarchives a session, projects the response, and installs the changed frame', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const sessions = new SessionRuntime(ctx, api, fakeRemote())
+    const workspaces = new WorkspaceRuntime(ctx, api, sessions)
+    api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-open'), updatedAt: 2, running: false, blank: false }],
+    }) as never)
+    await sessions.refresh()
+    sessions.open(sid('s-open'))
+    api.onWorkspaceArchiveSession = () => Promise.resolve(ok({ archivedSessionIds: [sid('s-idle')] }))
+    await workspaces.archiveSession(sid('s-idle'))
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle'])
+
+    api.onWorkspaceUnarchiveSession = () => Promise.resolve(ok({ archivedSessionIds: [] }))
+    await expect(workspaces.unarchiveSession(sid('s-idle'))).resolves.toBeUndefined()
+    expect(api.callsOf('workspace.unarchiveSession')).toEqual([{ sessionId: 's-idle' }])
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([])
+    expect(sessions.list.getSnapshot().current).toBe('s-open')
+
+    workspaces.handleHostEnvelope({
+      rpcId: 'frame' as never,
+      payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s-idle')] },
+    } as never)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle'])
+  })
+
   it('clears a current archived by a remote frame and shields the set from a stale in-flight baseline', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

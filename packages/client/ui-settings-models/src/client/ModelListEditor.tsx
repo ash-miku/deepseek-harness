@@ -20,6 +20,8 @@ import type { DiscoveredModelView, IApiClient } from '@deepseek-ai/dsh-api-remot
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { formatCapacity, parseCapacity } from './DeepSeekModelsEditor.tsx'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
+import { REASONING_LEVELS, levelName, reasoningEffortsOf, reasoningModeOf } from './reasoning.ts'
+import type { ModelReasoningEfforts, ReasoningEfforts, ReasoningLevel } from './reasoning.ts'
 import { messageOf } from './store.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
@@ -167,16 +169,17 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   // Rows carry an id and a name; capacities are the exception, so they stay
   // folded until asked for rather than crowding every row with four inputs.
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set())
-  // Capacities are edited as text, so a field's keystrokes are held here rather
-  // than re-derived from the parsed count on every change — that would rewrite
-  // `1000` to `1K` mid-word. Unreadable text is kept past blur so the refusal
-  // names a row the user can still see, which is why this is one entry PER
-  // FIELD: a single buffer would be displaced by editing any other field, and
-  // the abandoned one would render its stored NaN as the literal `NaN`.
+  // Capacities and wire spellings are edited as text, so a field's keystrokes
+  // are held here rather than re-derived from the parsed value on every change —
+  // that would rewrite `1000` to `1K` mid-word. Unreadable text is kept past
+  // blur so the refusal names a row the user can still see, which is why this
+  // is one entry PER FIELD: a single buffer would be displaced by editing any
+  // other field, and the abandoned one would render its stored NaN as the
+  // literal `NaN`.
   const [editing, setEditing] = useState<ReadonlyMap<string, string>>(new Map())
 
-  /** Buffer key for one capacity field; the row half moves when rows do. */
-  const bufferKey = (index: number, field: CapacityField): string => `${String(index)}:${field}`
+  /** Buffer key for one capacity or wire-spelling field; the row half moves when rows do. */
+  const bufferKey = (index: number, field: string): string => `${String(index)}:${field}`
 
   const editCapacity = (index: number, field: CapacityField, text: string): void => {
     setEditing(current => new Map(current).set(bufferKey(index, field), text))
@@ -225,6 +228,97 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
         Object.entries({ ...model, ...next }).filter(([key]) => !cleared.has(key)),
       )
     }))
+  }
+
+  /** Set one row's reasoning declaration, or delete the field to inherit. */
+  const patchReasoning = (index: number, value: ModelReasoningEfforts): void => {
+    onChange(models.map((model, at) => {
+      if (at !== index) return model
+      const next = { ...model }
+      if (value === undefined) Reflect.deleteProperty(next, 'reasoningEfforts')
+      else next['reasoningEfforts'] = value
+      return next
+    }))
+  }
+
+  /** What one checked level's wire spelling currently shows. */
+  const effortText = (model: ModelDraft, index: number, level: ReasoningLevel): string => {
+    const typed = editing.get(bufferKey(index, `effort:${level}`))
+    if (typed !== undefined) return typed
+    const efforts = reasoningEffortsOf(model)
+    if (typeof efforts !== 'object') return ''
+    const value = efforts[level]
+    return typeof value === 'string' ? value : ''
+  }
+
+  /** Drop one level's wire buffer, or all of a row's when `level` is omitted. */
+  const clearEffortBuffers = (index: number, level?: ReasoningLevel): void => {
+    setEditing((current) => {
+      const next = new Map(current)
+      const prefix = `${String(index)}:effort:`
+      for (const key of next.keys()) {
+        if (key.startsWith(prefix) && (level === undefined || key === bufferKey(index, `effort:${level}`))) {
+          next.delete(key)
+        }
+      }
+      return next
+    })
+  }
+
+  /**
+   * Switch a row between inheriting the catalog's capability, declaring a
+   * non-reasoning model, and declaring exact thinking levels.
+   */
+  const setReasoningMode = (index: number, mode: string): void => {
+    clearEffortBuffers(index)
+    if (mode === 'inherit') { patchReasoning(index, undefined); return }
+    if (mode === 'none') { patchReasoning(index, false); return }
+    // Declaring opens with the pair most OpenAI-compatible gateways accept;
+    // the user can remove it or rename each level's wire spelling.
+    const current = reasoningEffortsOf(models[index])
+    patchReasoning(index, typeof current === 'object' ? current : { off: null, high: 'high' })
+  }
+
+  /** Add or remove one offered thinking level. */
+  const toggleReasoningLevel = (index: number, level: ReasoningLevel, checked: boolean): void => {
+    const current = reasoningEffortsOf(models[index])
+    const next: ReasoningEfforts = typeof current === 'object' ? { ...current } : {}
+    clearEffortBuffers(index, level)
+    if (!checked) {
+      Reflect.deleteProperty(next, level)
+    } else if (level === 'off') {
+      next.off = null
+    } else {
+      next[level] = level
+    }
+    patchReasoning(index, next)
+  }
+
+  /** Keep the typed wire spelling; an empty Off maps to null ("send nothing"). */
+  const editReasoningWire = (index: number, level: ReasoningLevel, text: string): void => {
+    const current = reasoningEffortsOf(models[index])
+    const next: ReasoningEfforts = typeof current === 'object' ? { ...current } : {}
+    const trimmed = text.trim()
+    next[level] = level === 'off' && trimmed.length === 0 ? null : trimmed
+    patchReasoning(index, next)
+    setEditing(currentMap => new Map(currentMap).set(bufferKey(index, `effort:${level}`), text))
+  }
+
+  /** Settle a wire field on blur, like the capacities: trim and drop the buffer. */
+  const settleReasoningWire = (index: number, level: ReasoningLevel): void => {
+    const key = bufferKey(index, `effort:${level}`)
+    const typed = editing.get(key)
+    if (typed === undefined) return
+    const current = reasoningEffortsOf(models[index])
+    const next: ReasoningEfforts = typeof current === 'object' ? { ...current } : {}
+    const trimmed = typed.trim()
+    next[level] = level === 'off' && trimmed.length === 0 ? null : trimmed
+    patchReasoning(index, next)
+    setEditing((currentMap) => {
+      const nextMap = new Map(currentMap)
+      nextMap.delete(key)
+      return nextMap
+    })
   }
 
   const fetchModels = async (): Promise<void> => {
@@ -331,97 +425,158 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
         </button>
       </div>
       {models.length === 0 ? <p className={styles['modelEmpty']}>{t('modelsEmpty')}</p> : null}
-      {models.map((model, index) => (
-        <div key={index} className={styles['modelEntry']}>
-          <div className={styles['modelRow']}>
-            <input
-              className={styles['input']}
-              type="text"
-              value={textOf(model, 'id')}
-              placeholder={t('modelId')}
-              aria-label={`${t('modelId')} ${index + 1}`}
-              disabled={disabled}
-              onChange={(event) => { patch(index, { id: event.target.value }) }}
-            />
-            <input
-              className={styles['input']}
-              type="text"
-              value={textOf(model, 'name')}
-              placeholder={t('modelName')}
-              aria-label={`${t('modelName')} ${index + 1}`}
-              disabled={disabled}
-              onChange={(event) => { patch(index, { name: event.target.value === '' ? undefined : event.target.value }) }}
-            />
-            <button
-              type="button"
-              className={styles['iconButton']}
-              aria-label={`${t('modelAdvanced')} ${index + 1}`}
-              aria-expanded={expanded.has(index)}
-              title={t('modelAdvanced')}
-              onClick={() => { toggleExpanded(index) }}
-            >
-              <IconChevron open={expanded.has(index)} />
-            </button>
-            <button
-              type="button"
-              className={`${styles['iconButton']} ${styles['iconButtonDanger']}`}
-              aria-label={`${t('removeModel')} ${index + 1}`}
-              title={t('removeModel')}
-              disabled={disabled}
-              onClick={() => {
-                onChange(models.filter((_model, at) => at !== index))
-                // Both stores are keyed by position, so every row after this
-                // one shifts down and would otherwise inherit its neighbour's
-                // state — a different row's capacities popping open, or its
-                // half-typed text appearing in another row's field.
-                setExpanded((current) => {
-                  const next = new Set<number>()
-                  for (const at of current) {
-                    if (at < index) next.add(at)
-                    else if (at > index) next.add(at - 1)
-                  }
-                  return next
-                })
-                setEditing(current => reindexOnRemove(current, index))
-              }}
-            >
-              <IconTrash />
-            </button>
+      {models.map((model, index) => {
+        const efforts = reasoningEffortsOf(model)
+        const reasoningMode = reasoningModeOf(efforts)
+        return (
+          <div key={index} className={styles['modelEntry']}>
+            <div className={styles['modelRow']}>
+              <input
+                className={styles['input']}
+                type="text"
+                value={textOf(model, 'id')}
+                placeholder={t('modelId')}
+                aria-label={`${t('modelId')} ${index + 1}`}
+                disabled={disabled}
+                onChange={(event) => { patch(index, { id: event.target.value }) }}
+              />
+              <input
+                className={styles['input']}
+                type="text"
+                value={textOf(model, 'name')}
+                placeholder={t('modelName')}
+                aria-label={`${t('modelName')} ${index + 1}`}
+                disabled={disabled}
+                onChange={(event) => { patch(index, { name: event.target.value === '' ? undefined : event.target.value }) }}
+              />
+              <button
+                type="button"
+                className={styles['iconButton']}
+                aria-label={`${t('modelAdvanced')} ${index + 1}`}
+                aria-expanded={expanded.has(index)}
+                title={t('modelAdvanced')}
+                onClick={() => { toggleExpanded(index) }}
+              >
+                <IconChevron open={expanded.has(index)} />
+              </button>
+              <button
+                type="button"
+                className={`${styles['iconButton']} ${styles['iconButtonDanger']}`}
+                aria-label={`${t('removeModel')} ${index + 1}`}
+                title={t('removeModel')}
+                disabled={disabled}
+                onClick={() => {
+                  onChange(models.filter((_model, at) => at !== index))
+                  // Both stores are keyed by position, so every row after this
+                  // one shifts down and would otherwise inherit its neighbour's
+                  // state — a different row's capacities popping open, or its
+                  // half-typed text appearing in another row's field.
+                  setExpanded((current) => {
+                    const next = new Set<number>()
+                    for (const at of current) {
+                      if (at < index) next.add(at)
+                      else if (at > index) next.add(at - 1)
+                    }
+                    return next
+                  })
+                  setEditing(current => reindexOnRemove(current, index))
+                }}
+              >
+                <IconTrash />
+              </button>
+            </div>
+            {expanded.has(index)
+              ? (
+                <div className={styles['modelAdvanced']}>
+                  <label className={styles['modelField']}>
+                    <span className={styles['modelFieldLabel']}>{t('modelContextWindow')}</span>
+                    <input
+                      className={styles['input']}
+                      type="text"
+                      inputMode="numeric"
+                      value={capacityText(model, index, 'contextWindow')}
+                      placeholder={CAPACITY_HINT.contextWindow}
+                      aria-label={`${t('modelContextWindow')} ${index + 1}`}
+                      disabled={disabled}
+                      onChange={(event) => { editCapacity(index, 'contextWindow', event.target.value) }}
+                    />
+                  </label>
+                  <label className={styles['modelField']}>
+                    <span className={styles['modelFieldLabel']}>{t('modelMaxTokens')}</span>
+                    <input
+                      className={styles['input']}
+                      type="text"
+                      inputMode="numeric"
+                      value={capacityText(model, index, 'maxTokens')}
+                      placeholder={CAPACITY_HINT.maxTokens}
+                      aria-label={`${t('modelMaxTokens')} ${index + 1}`}
+                      disabled={disabled}
+                      onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
+                    />
+                  </label>
+                  <div className={styles['modelReasoning']}>
+                    <label className={styles['modelField']}>
+                      <span className={styles['modelFieldLabel']}>{t('reasoningEfforts')}</span>
+                      <select
+                        className={`${styles['input']} ${styles['selectInput']}`}
+                        value={reasoningMode}
+                        aria-label={`${t('reasoningEfforts')} ${index + 1}`}
+                        disabled={disabled}
+                        onChange={(event) => { setReasoningMode(index, event.target.value) }}
+                      >
+                        <option value="inherit">{t('reasoningInherit')}</option>
+                        <option value="none">{t('reasoningOff')}</option>
+                        <option value="declared">{t('reasoningOn')}</option>
+                      </select>
+                    </label>
+                    {reasoningMode === 'declared'
+                      ? (
+                        <div className={styles['reasoningLevels']}>
+                          {REASONING_LEVELS.map((level) => {
+                            const checked = typeof efforts === 'object' && efforts[level] !== undefined
+                            return (
+                              <label key={level} className={styles['reasoningLevel']}>
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  aria-label={`${t('reasoningLevel')} ${levelName(level)} ${index + 1}`}
+                                  disabled={disabled}
+                                  onChange={(event) => {
+                                    toggleReasoningLevel(index, level, event.target.checked)
+                                  }}
+                                />
+                                <span className={styles['reasoningLevelName']}>{levelName(level)}</span>
+                                {checked
+                                  ? (
+                                    <input
+                                      className={styles['input']}
+                                      type="text"
+                                      value={effortText(model, index, level)}
+                                      placeholder={level === 'off'
+                                        ? t('reasoningOffWireHint')
+                                        : t('reasoningWireHint')}
+                                      aria-label={`${t('reasoningWire')} ${levelName(level)} ${index + 1}`}
+                                      disabled={disabled}
+                                      onChange={(event) => {
+                                        editReasoningWire(index, level, event.target.value)
+                                      }}
+                                      onBlur={() => { settleReasoningWire(index, level) }}
+                                    />
+                                  )
+                                  : null}
+                              </label>
+                            )
+                          })}
+                        </div>
+                      )
+                      : null}
+                  </div>
+                </div>
+              )
+              : null}
           </div>
-          {expanded.has(index)
-            ? (
-              <div className={styles['modelAdvanced']}>
-                <label className={styles['modelField']}>
-                  <span className={styles['modelFieldLabel']}>{t('modelContextWindow')}</span>
-                  <input
-                    className={styles['input']}
-                    type="text"
-                    inputMode="numeric"
-                    value={capacityText(model, index, 'contextWindow')}
-                    placeholder={CAPACITY_HINT.contextWindow}
-                    aria-label={`${t('modelContextWindow')} ${index + 1}`}
-                    disabled={disabled}
-                    onChange={(event) => { editCapacity(index, 'contextWindow', event.target.value) }}
-                  />
-                </label>
-                <label className={styles['modelField']}>
-                  <span className={styles['modelFieldLabel']}>{t('modelMaxTokens')}</span>
-                  <input
-                    className={styles['input']}
-                    type="text"
-                    inputMode="numeric"
-                    value={capacityText(model, index, 'maxTokens')}
-                    placeholder={CAPACITY_HINT.maxTokens}
-                    aria-label={`${t('modelMaxTokens')} ${index + 1}`}
-                    disabled={disabled}
-                    onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
-                  />
-                </label>
-              </div>
-            )
-            : null}
-        </div>
-      ))}
+        )
+      })}
       <button
         type="button"
         className={styles['addModelButton']}

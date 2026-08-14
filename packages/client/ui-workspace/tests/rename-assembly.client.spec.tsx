@@ -34,6 +34,9 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.provide('locale', locale)
   runtime.slots.installLocale(locale)
+  // The injected open/startSession arms dismiss the mobile drawer; the
+  // assembly bench must stand in for the layout service face.
+  runtime.provide('layout', { collapseSidebar: vi.fn() })
   return runtime
 }
 

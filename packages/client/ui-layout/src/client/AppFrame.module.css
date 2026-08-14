@@ -20,9 +20,17 @@
   .frame {
     transition: none;
   }
+
+  .sidebarCol.drawer {
+    animation: none;
+  }
 }
 
+/* Columns are pinned to their tracks: the drawer leaves the sidebar's track
+   to auto-placement would shift every following column left by one, crushing
+   the center into the 0px track while details steals its width. */
 .sidebarCol {
+  grid-column: 1;
   min-width: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
@@ -30,6 +38,7 @@
 }
 
 .centerCol {
+  grid-column: 2;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -37,9 +46,38 @@
 }
 
 .detailsCol {
+  grid-column: 3;
   min-width: 0;
   overflow: hidden;
   border-left: 1px solid var(--dsw-alias-border-l2);
+}
+
+/* Narrow expanded sidebar = drawer: the column leaves the grid (track 0)
+   and overlays the center, sliding in from the left edge on the same slow
+   ease the wide collapse/expand rides. The rail state keeps its grid slot,
+   so only the drawer matches this rule. */
+.sidebarCol.drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 12;
+  animation: drawer-slide-in var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+@keyframes drawer-slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+/* Drawer scrim: dims and intercepts the covered frame so one tap dismisses
+   the drawer. The drawer itself paints above it (z-index) and stays
+   interactive. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  background: var(--dsw-alias-bg-mask-1);
 }
 
 /* The details subtree stays mounted at zero width, so its border must not paint

@@ -14,11 +14,10 @@
  * and at least one model — are required here rather than at load, so the
  * failure names the field while the user is still looking at it.
  *
- * There is deliberately no reasoning-effort control, here or on the editor
- * card: effort is a per-MODEL capability, and the models under one provider
- * disagree about it, so a provider-scoped control can only be set to a value
- * some of them reject. The composer's model picker offers each model its own
- * levels instead.
+ * Reasoning effort stays per-MODEL, so there is no provider-scoped control
+ * here or on the editor card: the models under one provider disagree about it,
+ * and the model list below declares each row's own levels. The composer's
+ * model picker offers those exact levels when the profile names them.
  */
 
 import { useState } from 'react'

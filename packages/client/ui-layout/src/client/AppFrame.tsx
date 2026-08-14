@@ -143,6 +143,15 @@ export function AppFrame({
   const colsRef = useRef(cols)
   colsRef.current = cols
 
+  // A narrow re-expanded sidebar renders as a DRAWER: it overlays the center
+  // (grid track 0) instead of sharing the frame, so on phones the conversation
+  // keeps the full viewport width instead of being crushed beside a 280px
+  // column. The drawer is capped at the viewport (a desktop drag width can
+  // exceed the phone screen) and closes via the scrim, Escape, or
+  // collapseSidebar (session pick / new session, wired by the shell plugins).
+  const drawer = narrow && !sidebarCollapsed
+  const drawerWidth = Math.min(sidebarPreference, viewport)
+
   // The drag base is the rendered width captured at drag start (grabbing a
   // concession-clamped panel must not jump back to the stored preference);
   // it stays frozen for the whole gesture so dx deltas do not compound.
@@ -160,17 +169,32 @@ export function AppFrame({
   const onDetailsDrag = useCallback((dx: number) => {
     actions.setDetails(detailsBase.current - dx)
   }, [actions])
+  // Drawer dismissal paths: tapping the scrim or pressing Escape while the
+  // drawer is open returns to the rail (a no-op while wide).
+  const collapseSidebar = useCallback(() => { actions.collapseSidebar() }, [actions])
+  useEffect(() => {
+    if (!drawer) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') collapseSidebar()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [drawer, collapseSidebar])
 
   return (
     <div
       ref={frameRef}
       className={css.frame}
-      style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
+      style={{ gridTemplateColumns: `${drawer ? 0 : cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
+      data-narrow-drawer={drawer || undefined}
       data-dragging={dragging || undefined}
     >
-      <div className={css.sidebarCol}>
+      <div
+        className={drawer ? `${css.sidebarCol} ${css.drawer}` : css.sidebarCol}
+        style={drawer ? { width: drawerWidth } : undefined}
+      >
         {/* Render-site slot call with live concession output: a closed
             sidebar keeps the mounted slot at the compact-rail width, and the
             component sees its rendered state as owner params decided here
@@ -178,7 +202,7 @@ export function AppFrame({
             renders the rail UI too). */}
         {renderSlot('sidebar', {
           collapsed: sidebarCollapsed,
-          width: cols.sidebar,
+          width: drawer ? drawerWidth : cols.sidebar,
         })}
       </div>
       <>
@@ -190,11 +214,17 @@ export function AppFrame({
         <CenterColumn>{renderSlot('conversation', {})}</CenterColumn>
         <DetailsColumn>{renderSlot('details', {})}</DetailsColumn>
       </>
+      {/* Drawer scrim: the expanded narrow sidebar overlays the center, and a
+          tap on the covered frame area dismisses it (drawer itself stays
+          interactive — it paints above the scrim). */}
+      {drawer && <div className={css.scrim} onClick={collapseSidebar} aria-hidden="true" />}
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>
-      {/* The collapsed rail is fixed-width: no resize handle while closed. */}
-      {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
+      {/* The collapsed rail is fixed-width: no resize handle while closed, and
+          the narrow drawer is not drag-resizable (mobile surfaces use the
+          stored preference; the frame handles the rail-only geometry). */}
+      {!narrow && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
       {cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
     </div>
   )

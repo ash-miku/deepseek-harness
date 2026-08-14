@@ -125,6 +125,8 @@ const DEFAULT_MAX_MESSAGES = 50
  */
 const WEB_SETTINGS_NAMESPACES = [
   'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek',
+  // @linxin666/dsh-web-ui-all family (third-party plugin configuration cards)
+  'dsh-ssh', 'live-stats', 'skin-background', 'task-board', 'remote-web-ui', 'pet',
 ] as const
 
 /** Provider work budget: at most 100 calls and 2,000 inspected hits. */
@@ -2916,6 +2918,12 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             details: { sessionId },
           })
         }
+        return ok(request, { archivedSessionIds: [...ctx.workspaceRegistry.archivedSessionIds] })
+      },
+
+      async unarchiveSession(request) {
+        const { sessionId } = request.payload
+        await ctx.workspaceRegistry.unarchiveSession(sessionId)
         return ok(request, { archivedSessionIds: [...ctx.workspaceRegistry.archivedSessionIds] })
       },
     },

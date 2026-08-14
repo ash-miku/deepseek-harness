@@ -13,6 +13,7 @@ function fakePanels(): PanelActions {
     setSidebar: vi.fn(),
     setDetails: vi.fn(),
     toggleSidebar: vi.fn(),
+    collapseSidebar: vi.fn(),
     setNarrow: vi.fn(),
     openDetails: vi.fn(),
     closeDetails: vi.fn(),
@@ -20,16 +21,18 @@ function fakePanels(): PanelActions {
 }
 
 describe('LayoutController', () => {
-  it('forwards the three panel actions to the attached set', () => {
+  it('forwards the four panel actions to the attached set', () => {
     const service = new LayoutController()
     const panels = fakePanels()
     service.attachPanels(panels)
 
     service.toggleSidebar()
+    service.collapseSidebar()
     service.openDetails()
     service.closeDetails()
 
     expect(panels.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(panels.collapseSidebar).toHaveBeenCalledTimes(1)
     expect(panels.openDetails).toHaveBeenCalledTimes(1)
     expect(panels.closeDetails).toHaveBeenCalledTimes(1)
     expect(panels.setSidebar).not.toHaveBeenCalled()
@@ -39,6 +42,7 @@ describe('LayoutController', () => {
   it('fails loud before the root entry wired its actions', () => {
     const service = new LayoutController()
     expect(() => { service.toggleSidebar() }).toThrow(/panel actions not wired/)
+    expect(() => { service.collapseSidebar() }).toThrow(/panel actions not wired/)
     expect(() => { service.openDetails() }).toThrow(/panel actions not wired/)
     expect(() => { service.closeDetails() }).toThrow(/panel actions not wired/)
   })

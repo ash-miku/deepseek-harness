@@ -10,6 +10,9 @@
  */
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+// Type-only: pulls ui-layout's cordis Context merge (ctx.layout — the
+// cross-plugin panel-action face) into every consumer's program.
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
@@ -42,7 +45,7 @@ const NS = 'workspace'
  * provides a waitable service. apply therefore depends on each slot
  * declaration through `slots.inject()` instead of assuming order.
  */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale']
+export const inject = ['slots', 'sessions', 'workspaces', 'layout', 'locale']
 
 /**
  * Register the browser and picker once their slot declarations are on the
@@ -70,8 +73,16 @@ export function apply(ctx: ClientContext): void {
   const browserInjected = (): WorkspaceBrowserInjected => ({
     // Explicit group actions keep their target; unscoped New Session inherits
     // the current Session Workspace before the recent-Workspace fallback.
-    startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId) },
-    open: (sessionId) => { ctx.sessions.open(sessionId) },
+    // Both destination flows dismiss the mobile drawer: the conversation must
+    // reclaim the full viewport once the pick is made (no-op while wide).
+    startSession: (workspaceId) => {
+      ctx.workspaces.startSession(workspaceId)
+      ctx.layout.collapseSidebar()
+    },
+    open: (sessionId) => {
+      ctx.sessions.open(sessionId)
+      ctx.layout.collapseSidebar()
+    },
     searchSessions,
     searchResultLimit: ctx.sessions.searchResultLimit,
     renameSession: async (sessionId, title) => {
@@ -95,6 +106,7 @@ export function apply(ctx: ClientContext): void {
       await ctx.workspaces.insertBefore(workspaceId, beforeWorkspaceId)
     },
     archiveSession: async (sessionId) => { await ctx.workspaces.archiveSession(sessionId) },
+    unarchiveSession: async (sessionId) => { await ctx.workspaces.unarchiveSession(sessionId) },
     insertSessionBefore: async (workspaceId, sessionId, beforeSessionId) => {
       await ctx.workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     },

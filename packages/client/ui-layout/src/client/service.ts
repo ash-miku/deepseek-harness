@@ -23,6 +23,8 @@ export type PanelActions = BoundActions<ReturnType<typeof createLayoutStore>>
 export interface ILayout {
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void
+  /** Close the mobile drawer: collapse the narrow-expanded sidebar to the rail (no-op while wide). */
+  collapseSidebar(): void
   /** Open the details panel (no-op when already open). */
   openDetails(): void
   /** Close the details panel. */
@@ -47,6 +49,11 @@ export class LayoutController implements ILayout {
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void {
     this.#require().toggleSidebar()
+  }
+
+  /** Close the mobile drawer: collapse the narrow-expanded sidebar to the rail (no-op while wide). */
+  collapseSidebar(): void {
+    this.#require().collapseSidebar()
   }
 
   /** Open the details panel (no-op when already open). */

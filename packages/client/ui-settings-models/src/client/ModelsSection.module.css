@@ -506,6 +506,44 @@
   padding: 8px 4px 2px;
 }
 
+/* Thinking-level declaration spans the row's full width, so the level list
+   does not compete with the capacity fields for a narrow column. */
+.modelReasoning {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.reasoningLevels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 6px;
+}
+
+.reasoningLevel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.reasoningLevelName {
+  flex: none;
+  width: 58px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.reasoningLevel .input {
+  flex: 1 1 120px;
+  min-width: 0;
+  height: 28px;
+}
+
 .modelField {
   display: flex;
   flex-direction: column;

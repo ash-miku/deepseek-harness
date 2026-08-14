@@ -20,7 +20,7 @@ import type {
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { WorkspaceBrowserProps } from './contract/slots.ts'
 import type { SessionNode, SessionOrderBy } from './tree.ts'
-import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
+import { ARCHIVED_KEY, deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
 import { WorkspacePickFlow } from './WorkspacePicker.tsx'
@@ -241,6 +241,8 @@ type SessionTreeProps = Pick<
   onSessionRename: (sessionId: SessionNode['id'], currentTitle: string) => void
   /** Archive a session (row menu action; the row disappears on the state echo). */
   onSessionArchive: (sessionId: SessionNode['id']) => void
+  /** Restore an archived session (row menu action; the row returns to its group). */
+  onSessionUnarchive: (sessionId: SessionNode['id']) => void
   /** Session order behavior: fixed after edits, or additionally promoted by user activity. */
   orderBy: SessionOrderBy
 }
@@ -248,7 +250,7 @@ type SessionTreeProps = Pick<
 /** The scrolling session tree; unmounting drops the sessions subscription and expand-all state. */
 function SessionTree({
   useSessions, startSession, open, forkSession, workspaces, archivedSessionIds,
-  onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
+  onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive, onSessionUnarchive,
   insertWorkspaceBefore, insertSessionBefore, orderBy,
   groupExpansion, setGroupExpanded,
   sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
@@ -484,28 +486,30 @@ function SessionTree({
               // Session drag never leaves its group. Ungrouped writes only the
               // browser-local account; real Workspaces may also write Host order.
                 const sameGroupDrag = drag !== null && drag.accountKey === group.key
-                const dragProps = {
-                  start: () => {
-                    sessionDropCommitted.current = false
-                    setDrag({ accountKey: group.key, sessionId: node.id, over: null })
-                  },
-                  active: sameGroupDrag,
-                  marker: sameGroupDrag && drag.over?.id === node.id ? drag.over.half : null,
-                  hover: (half: 'before' | 'after') => {
-                  /* v8 ignore next -- narrowing guard: Rows gates hover on `active`, which is false while the drag state is null. */
-                    setDrag(d => (d === null ? d : { ...d, over: { id: node.id, half } }))
-                  },
-                  drop: (half: 'before' | 'after') => {
-                  /* v8 ignore next -- narrowing guard: Rows gates drop on `active`, which is false while the drag state is null. */
-                    if (drag === null) return
-                    commitSessionDrag(drag, { id: node.id, half })
-                  },
-                  end: () => {
-                    if (drag?.over !== null && drag?.over !== undefined) commitSessionDrag(drag, drag.over)
-                    else setDrag(null)
-                    sessionDropCommitted.current = false
-                  },
-                }
+                const dragProps = group.key === ARCHIVED_KEY
+                  ? undefined
+                  : {
+                    start: () => {
+                      sessionDropCommitted.current = false
+                      setDrag({ accountKey: group.key, sessionId: node.id, over: null })
+                    },
+                    active: sameGroupDrag,
+                    marker: sameGroupDrag && drag.over?.id === node.id ? drag.over.half : null,
+                    hover: (half: 'before' | 'after') => {
+                    /* v8 ignore next -- narrowing guard: Rows gates hover on `active`, which is false while the drag state is null. */
+                      setDrag(d => (d === null ? d : { ...d, over: { id: node.id, half } }))
+                    },
+                    drop: (half: 'before' | 'after') => {
+                    /* v8 ignore next -- narrowing guard: Rows gates drop on `active`, which is false while the drag state is null. */
+                      if (drag === null) return
+                      commitSessionDrag(drag, { id: node.id, half })
+                    },
+                    end: () => {
+                      if (drag?.over !== null && drag?.over !== undefined) commitSessionDrag(drag, drag.over)
+                      else setDrag(null)
+                      sessionDropCommitted.current = false
+                    },
+                  }
                 return (
                   <SessionNodeItem
                     key={node.id}
@@ -516,6 +520,7 @@ function SessionTree({
                     onRename={onSessionRename}
                     onFork={forkSession}
                     onArchive={onSessionArchive}
+                    onUnarchive={onSessionUnarchive}
                     drag={dragProps}
                     t={t}
                   />
@@ -544,7 +549,7 @@ function SessionTree({
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  useSessions, open, forkSession, onSessionRename, onSessionArchive, archivedSessionIds,
+  useSessions, open, forkSession, onSessionRename, onSessionArchive, onSessionUnarchive, archivedSessionIds,
   orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
 }: Pick<
   SessionTreeProps,
@@ -553,6 +558,7 @@ function FlatList({
   | 'forkSession'
   | 'onSessionRename'
   | 'onSessionArchive'
+  | 'onSessionUnarchive'
   | 'archivedSessionIds'
   | 'orderBy'
   | 'sessionOrderByAccount'
@@ -632,6 +638,7 @@ function FlatList({
               onRename={onSessionRename}
               onFork={forkSession}
               onArchive={onSessionArchive}
+              onUnarchive={onSessionUnarchive}
               flat
               drag={{
                 start: () => {
@@ -753,6 +760,7 @@ export function WorkspaceBrowser({
   deleteWorkspace,
   insertWorkspaceBefore,
   archiveSession,
+  unarchiveSession,
   insertSessionBefore,
   createWorkspace,
   searchSessions,
@@ -776,6 +784,7 @@ export function WorkspaceBrowser({
     if (workspacePhase !== 'ready') return
     actions.retainAccountKeys([
       UNGROUPED_KEY,
+      ARCHIVED_KEY,
       FLAT_SESSION_ORDER_KEY,
       ...workspaces.map(workspace => workspace.workspaceId as string),
     ])
@@ -934,6 +943,14 @@ export function WorkspaceBrowser({
   const onSessionArchive = (sessionId: SessionNode['id']) => {
     archiveSession(sessionId).catch((reason: unknown) => {
       console.warn('session archive rejected:', reason)
+    })
+  }
+
+  // Unarchive is dialog-free for the same reason as archive: it only changes
+  // grouping visibility, never the log or workspace accounting.
+  const onSessionUnarchive = (sessionId: SessionNode['id']) => {
+    unarchiveSession(sessionId).catch((reason: unknown) => {
+      console.warn('session unarchive rejected:', reason)
     })
   }
 
@@ -1124,6 +1141,7 @@ export function WorkspaceBrowser({
               <FlatList
                 useSessions={useSessions} open={open} forkSession={forkSession}
                 onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
+                onSessionUnarchive={onSessionUnarchive}
                 archivedSessionIds={archivedSessionIds}
                 orderBy={orderBy}
                 sessionOrderByAccount={sessionOrderByAccount}
@@ -1138,6 +1156,7 @@ export function WorkspaceBrowser({
                 useSessions={useSessions}
                 onSessionRename={onSessionRename}
                 onSessionArchive={onSessionArchive}
+                onSessionUnarchive={onSessionUnarchive}
                 forkSession={forkSession}
                 workspaces={workspaces}
                 groupExpansion={groupExpansion}

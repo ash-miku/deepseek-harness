@@ -76,6 +76,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     renameWorkspace: vi.fn(async () => {}),
     deleteWorkspace: vi.fn(async () => {}),
     archiveSession: vi.fn(async () => {}),
+    unarchiveSession: vi.fn(async () => {}),
     insertWorkspaceBefore: vi.fn(async () => {}),
     insertSessionBefore: vi.fn(async () => {}),
     createWorkspace: vi.fn(async () => workspace('created', [])),
@@ -314,25 +315,35 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('two')
   })
 
-  it('archives a session from the row menu and hides archived rows in both modes', async () => {
+  it('archives a session into the archived bucket, then restores it from either mode', async () => {
     const archiveSession = vi.fn(async () => {})
+    const unarchiveSession = vi.fn(async () => {})
     const b = mount({
       useSessions: hook(sessionState([summary('kept-s', 2), summary('gone-s', 1)])),
       useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])])),
       archiveSession,
+      unarchiveSession,
     })
     fireEvent.click(screen.getByText('alpha'))
     fireEvent.click(screen.getByRole('button', { name: '会话“gone-s”的操作' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '归档会话' }))
     expect(archiveSession).toHaveBeenCalledWith(sid('gone-s'))
 
-    // The archive-set echo hides the row in grouped and flat modes.
+    // The archive-set echo hides the row from the ordinary group. The archived
+    // bucket is present but folded, so the row is still not visible yet.
     rerender(b, { useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])], [sid('gone-s')])) })
     expect(screen.queryByText('gone-s')).toBeNull()
+    fireEvent.click(screen.getByText('已归档'))
+    expect(screen.getByText('gone-s')).toBeTruthy()
+
+    // Flat mode keeps archived rows visible and offers restore instead of archive.
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
     expect(screen.getByText('kept-s')).toBeTruthy()
-    expect(screen.queryByText('gone-s')).toBeNull()
+    const archivedRow = screen.getByText('gone-s').closest('[role="treeitem"]') as HTMLElement
+    fireEvent.click(archivedRow.querySelector('button[aria-label^="会话“gone-s”的操作"]') as HTMLElement)
+    fireEvent.click(screen.getByRole('menuitem', { name: '取消归档' }))
+    expect(unarchiveSession).toHaveBeenCalledWith(sid('gone-s'))
   })
 
   it('logs and keeps the tree when the archive call rejects', async () => {

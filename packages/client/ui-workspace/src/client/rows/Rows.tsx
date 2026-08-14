@@ -118,8 +118,12 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
   t: RowTranslate
 }) {
   const row = group
-  // The ungrouped bucket has no workspace title: its label is dictionary copy.
-  const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
+  // Ungrouped and archived buckets have no workspace title: dictionary copy.
+  const label = row.archived
+    ? t('group.archived')
+    : row.workspaceId === undefined
+      ? t('group.ungrouped')
+      : row.label
   const active = group.expanded && group.containsCurrent
   const [menuOpen, setMenuOpen] = useState(false)
   const workspaceMenuItems = [
@@ -180,14 +184,16 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
             )}
           />
         )}
-        <button
-          type="button"
-          className={css.iconButton}
-          aria-label={t('actions.newSession.aria', { name: label })}
-          onClick={(e) => { e.stopPropagation(); onCreate() }}
-        >
-          <IconPlusOutline16 />
-        </button>
+        {!row.archived && (
+          <button
+            type="button"
+            className={css.iconButton}
+            aria-label={t('actions.newSession.aria', { name: label })}
+            onClick={(e) => { e.stopPropagation(); onCreate() }}
+          >
+            <IconPlusOutline16 />
+          </button>
+        )}
       </span>
     </div>
   )
@@ -345,12 +351,13 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @param props.onRename - open the session rename dialog (id + current title).
  * @param props.onFork - fork a session at its last completed turn.
  * @param props.onArchive - archive a session by id.
+ * @param props.onUnarchive - restore an archived session by id.
  * @param props.drag - optional draggable-row wiring.
  * @param props.flat - omit the empty status slot in the hierarchy-free flat list.
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
+export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, onUnarchive, drag, flat = false, t }: {
   node: SessionNode
   currentId: string | undefined
   now: number
@@ -361,6 +368,8 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   onFork: (id: SessionNode['id']) => void
   /** Archive this session (row menu action; commits without a dialog). */
   onArchive: (id: SessionNode['id']) => void
+  /** Restore this archived session (row menu action; commits without a dialog). */
+  onUnarchive: (id: SessionNode['id']) => void
   /** Present only on draggable rows (workspace-group sessions outside search). */
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
@@ -381,7 +390,9 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
     { id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> },
     // 20-native glyph in the menu's 16px icon slot (Menu.module.css .itemIcon).
-    { id: 'archive', label: t('menu.archiveSession'), icon: <IconArchiveOutline20 size={16} /> },
+    row.archived
+      ? { id: 'unarchive', label: t('menu.unarchiveSession'), icon: <IconArchiveOutline20 size={16} /> }
+      : { id: 'archive', label: t('menu.archiveSession'), icon: <IconArchiveOutline20 size={16} /> },
   ]
   // Figma session cell: pad 8, status slot 16, then a 4px title gap.
   const ownRow = (
@@ -444,6 +455,7 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
               if (id === 'rename') onRename(node.id, row.title)
               if (id === 'fork') onFork(node.id)
               if (id === 'archive') onArchive(node.id)
+              if (id === 'unarchive') onUnarchive(node.id)
             }}
             portal
             closeOnPointerLeave

@@ -255,6 +255,25 @@ export class WorkspaceRegistry extends Service {
   }
 
   /**
+   * Restore one session to grouping surfaces by removing it from the
+   * registry-global archive set durably. The session log and workspace
+   * accounting slot are untouched. An id outside the set is an idempotent
+   * no-op.
+   * @param sessionId - The session to restore.
+   * @returns resolution after durability.
+   */
+  unarchiveSession(sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      if (!this.requireState().archivedSessionIds.includes(sessionId)) return
+      const state = this.requireState()
+      await this.setState({
+        ...state,
+        archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
+      })
+    })
+  }
+
+  /**
    * Whether a session is live, header-indexed, or present in a fresh
    * persistence listing. Only a definite miss returns false — a failing
    * `sessionPersistence.list()` propagates so storage faults never

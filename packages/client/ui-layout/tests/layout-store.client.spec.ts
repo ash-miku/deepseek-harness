@@ -61,6 +61,29 @@ describe('createLayoutStore', () => {
     expect(store.getSnapshot().sidebar).toBe(400)
   })
 
+  it('collapseSidebar closes the drawer while narrow and keeps the preference', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.setSidebar(400)
+    actions.setNarrow(true)
+    actions.toggleSidebar()
+    expect(store.getSnapshot().narrowExpanded).toBe(true)
+    actions.collapseSidebar()
+    expect(store.getSnapshot()).toEqual({ sidebar: 400, details: 0, narrow: true, narrowExpanded: false })
+    // Idempotent: collapsing an already-closed drawer changes nothing.
+    actions.collapseSidebar()
+    expect(store.getSnapshot().narrowExpanded).toBe(false)
+  })
+
+  it('collapseSidebar is a no-op while wide (desktop keeps the sidebar open)', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.toggleSidebar() // close wide: sidebar 0
+    actions.collapseSidebar()
+    expect(store.getSnapshot().sidebar).toBe(0)
+    actions.toggleSidebar() // reopen wide: contract default
+    actions.collapseSidebar()
+    expect(store.getSnapshot().sidebar).toBe(SIDEBAR_DEFAULT)
+  })
+
   it('crossing the breakpoint drops the override; a same-value setNarrow keeps it', () => {
     const { store, actions } = createLayoutStore().create()
     actions.setNarrow(true)

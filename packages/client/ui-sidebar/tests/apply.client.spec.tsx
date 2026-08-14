@@ -9,7 +9,7 @@ import type { SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/cli
 async function bench(declare = true) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
-  const layout = { toggleSidebar: vi.fn() }
+  const layout = { toggleSidebar: vi.fn(), collapseSidebar: vi.fn() }
   const workspaces = { startSession: vi.fn() }
   const sessions = { open: vi.fn(), clear: vi.fn() }
   ctx.provide('layout', layout)
@@ -42,13 +42,17 @@ describe('ui-sidebar apply', () => {
     expect(b.slots.entries('sidebar')[0]!.locale).toBe('sidebar')
     const injected = (b.slots.entries('sidebar')[0]!.inject as () => SidebarRootInjected)()
     expect(Object.keys(injected)).toEqual(['startSession', 'toggleSidebar'])
-    // Both arms delegate to the runtime's shared New Session action.
+    // Both arms delegate to the runtime's shared New Session action, and the
+    // start arm dismisses the mobile drawer (no-op while wide).
     injected.startSession('workspace' as never)
     expect(b.workspaces.startSession).toHaveBeenCalledWith('workspace')
+    expect(b.layout.collapseSidebar).toHaveBeenCalledTimes(1)
     injected.startSession()
     expect(b.workspaces.startSession).toHaveBeenLastCalledWith(undefined)
+    expect(b.layout.collapseSidebar).toHaveBeenCalledTimes(2)
     injected.toggleSidebar()
     expect(b.layout.toggleSidebar).toHaveBeenCalledOnce()
+    expect(b.layout.collapseSidebar).toHaveBeenCalledTimes(2)
   })
 
   it('fails when no live owner declared the sidebar slot', async () => {

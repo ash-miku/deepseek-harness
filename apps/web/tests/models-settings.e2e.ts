@@ -187,9 +187,9 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     await dialog.getByLabel('Provider ID').fill('acme-gateway')
     await dialog.getByLabel('显示名称').fill('Acme Gateway')
     await dialog.getByLabel('API 地址').fill('https://gateway.acme.example/v1')
-    // No reasoning effort on a provider card at all: effort is a per-model
-    // capability, the models under one provider disagree about it, and a
-    // switch in the composer already records provider+model+effort together.
+    // No provider-card-level reasoning control: effort stays a per-model
+    // capability, and the model row's own disclosure declares it. The composer
+    // switch then records provider+model+effort together.
     expect(await dialog.getByLabel('推理强度').count()).toBe(0)
     await dialog.getByRole('button', { name: '添加模型' }).click()
     await dialog.getByLabel('模型 ID 1').fill('acme-large')
