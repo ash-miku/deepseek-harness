@@ -147,3 +147,7 @@ Docs accompany every code change: update affected README and JSDoc contracts tog
 ## Vendoring policy
 
 `vendor/` packages are pinned source copies (manifest with upstream SHAs in [vendor/README.md](vendor/README.md)). Update via the sync procedure there; re-apply or retire the logged local modifications; rerun `pnpm run test && pnpm run build`.
+
+## Local deployment on this host
+
+This checkout is served by `dsh-web.service` from `/root/github/deepseek-harness`. After changing `packages/`, `apps/`, or frontend source, run `pnpm run build`. Do not restart `dsh-web.service` yourself; tell the user a restart is needed and wait for confirmation. Do not start a second `dsh web` instance manually; it conflicts with the service on the Web port.
