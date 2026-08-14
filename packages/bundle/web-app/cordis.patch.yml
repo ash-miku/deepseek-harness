@@ -185,6 +185,10 @@
     - id: ui-sidebar
       name: '@deepseek-ai/dsh-client-ui-sidebar'
 
+    # DeepSeek account balance above the Settings foot action.
+    - id: ui-deepseek-balance
+      name: '@deepseek-ai/dsh-client-ui-deepseek-balance'
+
     - id: ui-settings
       name: '@deepseek-ai/dsh-client-ui-settings'
 

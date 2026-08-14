@@ -1,0 +1,49 @@
+/* Compact footer action above Settings: icon + amount (wide) or icon (rail). */
+
+.action {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.rail {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+.label {
+  font-variant-numeric: tabular-nums;
+}
+
+.refresh {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.action[data-status='error'] {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.spin {
+  animation: dsh-balance-spin 1s linear infinite;
+}
+
+@keyframes dsh-balance-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
