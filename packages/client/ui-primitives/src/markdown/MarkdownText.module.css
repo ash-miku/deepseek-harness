@@ -3,14 +3,20 @@
    intentionally absent (no matching DOM). Token names match that sheet. */
 
 .markdown {
+  --dsh-markdown-heading: color-mix(in srgb, var(--dsw-alias-state-business-primary) 84%, var(--dsw-alias-bg-base));
+  --dsh-markdown-strong: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 84%, var(--dsw-alias-bg-base));
+  --dsh-markdown-inline-code: color-mix(in srgb, var(--dsw-alias-state-success-primary) 82%, var(--dsw-alias-bg-base));
+  --dsh-markdown-quote: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 78%, var(--dsw-alias-bg-base));
   min-width: 0;
   overflow-wrap: anywhere;
   font: var(--dsw-font-markdown-base);
+  font-weight: 500;
   color: var(--dsw-alias-label-primary);
 }
 
 .markdown strong {
-  font-weight: 600;
+  color: var(--dsh-markdown-strong);
+  font-weight: 700;
 }
 
 .markdown h1 {
@@ -38,8 +44,19 @@
   margin: 16px 0;
 }
 
+.markdown :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--dsh-markdown-heading);
+}
+
 .markdown :where(h1, h2, h3, h4, h5, h6) strong {
+  color: inherit;
   font-weight: inherit;
+}
+
+.markdown em {
+  color: var(--dsh-markdown-quote);
+  font-style: italic;
+  font-weight: 700;
 }
 
 .markdown p {
@@ -97,7 +114,7 @@
 
 .markdown li::marker {
   line-height: 28px;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-state-business-primary);
 }
 
 /* Nested ol under ul/ol: markers inside (models sometimes emit this shape). */
@@ -132,7 +149,8 @@
 }
 
 .markdown blockquote {
-  border-left: 2px solid var(--dsw-alias-label-caption);
+  border-left: 2px solid var(--dsh-markdown-quote);
+  color: var(--dsh-markdown-quote);
   margin: 16px 0 0;
   padding-left: 14px;
 }
@@ -147,9 +165,11 @@
   display: inline-flex;
   align-items: center;
   box-sizing: border-box;
+  color: var(--dsh-markdown-inline-code);
   font: var(--dsw-font-markdown-code);
   font-family: var(--ds-font-family-code);
   font-size: 0.875em !important;
+  font-weight: 700;
   background-color: var(--dsw-alias-markdown-inline-code);
   border-radius: 6px;
   padding: 0 5px;
