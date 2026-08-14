@@ -40,7 +40,7 @@ import type {
   ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
-  WorkspaceId, WorkspaceView,
+  WorkspaceId, WorkspaceView, DeepseekBalanceView,
 } from './api/index.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
@@ -1105,6 +1105,13 @@ function changedWorkspaceView(workspaceId: string, value: unknown): WorkspaceVie
  * @param defaults - host routing and project-directory defaults.
  * @returns the ApiProxy implementation.
  */
+/** DeepSeek account-balance endpoint (the official API, not the search base). */
+const DEEPSEEK_BALANCE_URL = 'https://api.deepseek.com/user/balance'
+/** Credential reference backing the balance read — the same key the llm/search adapters use. */
+const DEEPSEEK_BALANCE_KEY_REF = 'DEEPSEEK_API_KEY'
+/** Host-side cache TTL for a balance reading (a settings-surface poll must not hammer upstream). */
+const DEEPSEEK_BALANCE_TTL_MS = 5 * 60_000
+
 export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiProxy {
   const sessionExportCompressionLevel = defaults.sessionExportCompressionLevel
     ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL
@@ -1129,6 +1136,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const sessionCreations = new Map<SessionId, Promise<Agent>>()
   /** Serializes path ownership and explicit title checks with Workspace mutations. */
   let workspaceCreationChain = Promise.resolve()
+  /** DeepSeek balance cache: last reading + its timestamp, keyed by credential ref. */
+  const deepseekBalanceCache = new Map<string, { view: DeepseekBalanceView; at: number }>()
   const pendingQuestions = new Map<RpcId, PendingQuestion>()
   const pendingApprovals = new Map<RpcId, PendingApproval>()
   const muxQueues = new Set<FrameQueue<RpcRequest<MuxFrame>>>()
@@ -3429,6 +3438,72 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             code: 'model-discovery-failed',
             message: error instanceof Error ? error.message : String(error),
             details: { settingsNs, ...baseURL === undefined ? {} : { baseURL } },
+          })
+        }
+      },
+    },
+
+    deepseek: {
+      async balance(request) {
+        const credentials = ctx.get('credentials')
+        if (credentials === undefined) return err(request, credentialsAbsent())
+        const ref = credentialRef(DEEPSEEK_BALANCE_KEY_REF)
+        const key = (await credentials.resolve(ref))?.value
+        if (key === undefined || key.length === 0) {
+          return err(request, {
+            code: 'deepseek-balance-unavailable',
+            message: 'DeepSeek API key is not configured (DEEPSEEK_API_KEY)',
+            details: {},
+          })
+        }
+        // Serve a fresh cached reading; force bypasses and re-queries upstream.
+        const cached = deepseekBalanceCache.get(DEEPSEEK_BALANCE_KEY_REF)
+        if (!request.payload.force && cached !== undefined && Date.now() - cached.at < DEEPSEEK_BALANCE_TTL_MS) {
+          return ok(request, { balance: cached.view })
+        }
+        try {
+          const response = await fetch(DEEPSEEK_BALANCE_URL, {
+            headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+          })
+          if (!response.ok) {
+            return err(request, {
+              code: 'deepseek-balance-unavailable',
+              message: `DeepSeek balance request failed: HTTP ${response.status}`,
+              details: {},
+            })
+          }
+          const body = await response.json() as {
+            is_available?: boolean
+            balance_infos?: Array<{
+              currency?: string
+              total_balance?: string
+              granted_balance?: string
+              topped_up_balance?: string
+            }>
+          }
+          const info = body.balance_infos?.[0]
+          if (info === undefined) {
+            return err(request, {
+              code: 'deepseek-balance-unavailable',
+              message: 'DeepSeek balance response carried no balance_infos entry',
+              details: {},
+            })
+          }
+          const view: DeepseekBalanceView = {
+            isAvailable: body.is_available ?? false,
+            currency: info.currency ?? '',
+            totalBalance: info.total_balance ?? '0',
+            grantedBalance: info.granted_balance ?? '0',
+            toppedUpBalance: info.topped_up_balance ?? '0',
+            cachedAt: Date.now(),
+          }
+          deepseekBalanceCache.set(DEEPSEEK_BALANCE_KEY_REF, { view, at: Date.now() })
+          return ok(request, { balance: view })
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'deepseek-balance-unavailable',
+            message: error instanceof Error ? error.message : String(error),
+            details: {},
           })
         }
       },
