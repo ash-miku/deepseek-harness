@@ -75,6 +75,12 @@
   font: var(--dsw-font-s-strong-14);
   font-weight: 700;
   white-space: nowrap;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Keep the blue shimmer on authored text only; emoji must stay native-color
+   or the gradient text fill paints them monochrome. */
+.turnStatusText {
   background: linear-gradient(
     90deg,
     var(--dsw-static-deepseek-500) 0%,
@@ -90,6 +96,12 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: dsh-turn-status-shimmer 1.8s linear infinite;
+}
+
+.turnStatusEmoji {
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  -webkit-text-fill-color: var(--dsw-alias-label-primary);
 }
 
 .turnStatusClock {
@@ -108,7 +120,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .turnStatus {
+  .turnStatusText {
     background-position: 0 0;
     background-size: 100% 100%;
     animation: none;

@@ -22,6 +22,7 @@ import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import { ProcessGroupRow } from './ProcessGroupRow.tsx'
+import { segmentRunningLabel } from './running-label-emoji.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
@@ -210,9 +211,17 @@ function TurnStatus({ startTime, labels, t }: {
   // Short turns keep the plain label; the clock only appears once the turn
   // has clearly been running for a while.
   const showClock = elapsedMs >= 15_000
+  const labelSegments = useMemo(() => segmentRunningLabel(label), [label])
   return (
     <div className={css.turnStatus} role="status" aria-live="polite">
-      {label}
+      {labelSegments.map((part, index) => (
+        <span
+          key={index}
+          className={part.emoji ? css.turnStatusEmoji : css.turnStatusText}
+        >
+          {part.text}
+        </span>
+      ))}
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
           {formatRunDuration(elapsedMs, t)}

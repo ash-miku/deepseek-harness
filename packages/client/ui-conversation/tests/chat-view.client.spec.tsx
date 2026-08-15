@@ -926,6 +926,17 @@ describe('ChatView', () => {
     expect(view.getByRole('status').textContent).toBe('Working hard...')
   })
 
+  it('renders running label emoji as a separate span', () => {
+    const h = makeHarness({ running: true })
+    h.props.runningLabels = createSnapshotStore('Ready \u{1F680}')
+    const view = render(<h.ChatView {...h.props} />)
+    const status = view.getByRole('status')
+    const spans = status.querySelectorAll('span')
+    expect(spans.length).toBe(2)
+    expect(spans[0]?.textContent).toBe('Ready ')
+    expect(spans[1]?.textContent).toBe('\u{1F680}')
+  })
+
   it('rotates configured running labels without repeating the current one', () => {
     vi.useFakeTimers()
     try {
