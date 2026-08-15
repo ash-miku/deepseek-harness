@@ -73,6 +73,7 @@
   align-items: center;
   height: 26px;
   font: var(--dsw-font-s-strong-14);
+  font-weight: 700;
   white-space: nowrap;
   background: linear-gradient(
     90deg,

@@ -2,7 +2,8 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
-  CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, DEFAULT_PROCESS_DISPLAY_MODE, apply,
+  CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, DEFAULT_PROCESS_DISPLAY_MODE,
+  DEFAULT_RUNNING_LABELS, apply,
 } from '@deepseek-ai/dsh-client-ui-conversation'
 
 class MemorySettings extends SettingsProvider {
@@ -23,14 +24,16 @@ describe('ui-conversation host', () => {
     expect(ctx.settings.get(ns)).toEqual({
       busyEnter: DEFAULT_BUSY_ENTER_BEHAVIOR,
       processDisplay: DEFAULT_PROCESS_DISPLAY_MODE,
+      runningLabels: DEFAULT_RUNNING_LABELS,
     })
     await ctx.settings.update(ns, { busyEnter: 'steer' })
     expect(ctx.settings.get(ns)).toEqual({
       busyEnter: 'steer',
       processDisplay: DEFAULT_PROCESS_DISPLAY_MODE,
+      runningLabels: DEFAULT_RUNNING_LABELS,
     })
     await ctx.settings.update(ns, { processDisplay: 'conclusion' })
-    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', processDisplay: 'conclusion' })
+    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', processDisplay: 'conclusion', runningLabels: DEFAULT_RUNNING_LABELS })
     await expect(ctx.settings.update(ns, { busyEnter: 'invalid' })).rejects.toThrow()
     await expect(ctx.settings.update(ns, { processDisplay: 'invalid' })).rejects.toThrow()
     await fiber.dispose()

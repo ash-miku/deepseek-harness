@@ -17,6 +17,7 @@ import type { AssistantBlock, ConversationTimelineSnapshot } from '@deepseek-ai/
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatNode } from '../contract/chat-nodes.ts'
+import { DEFAULT_RUNNING_LABELS, parseRunningLabels } from '../../submission-settings.ts'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { formatRunDuration } from './message-chrome.ts'
@@ -27,6 +28,20 @@ const FOLLOW_THRESHOLD = 24
 
 const ABSENT_DISPLAY_SUBSCRIBE = (): (() => void) => () => {}
 const ABSENT_DISPLAY_READ = () => 'full' as const
+
+const ABSENT_RUNNING_LABELS_SUBSCRIBE = (): (() => void) => () => {}
+const ABSENT_RUNNING_LABELS_READ = () => DEFAULT_RUNNING_LABELS
+
+const RUNNING_LABEL_ROTATE_MS = 5_000
+
+function chooseRunningLabel(labels: readonly string[], previous: string | null): string {
+  const candidates = labels.length > 1
+    ? labels.filter(label => label !== previous)
+    : labels
+  return candidates[Math.floor(Math.random() * candidates.length)]
+    ?? labels[0]
+    ?? DEFAULT_RUNNING_LABELS
+}
 
 interface UnifiedFoldGroup {
   readonly key: string
@@ -156,13 +171,29 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
 }
 
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
-function TurnStatus({ startTime, t }: {
+function TurnStatus({ startTime, labels, t }: {
   /** The running turn's logged `turn/start` time; null falls back to mount
    *  time when that boundary is outside the window. */
   startTime: number | null
+  /** User-configured running-status labels. */
+  labels: readonly string[]
   /** The owning view's locale seat. */
   t: ChatViewSlotProps['t']
 }) {
+  const [label, setLabel] = useState(() => chooseRunningLabel(labels, null))
+  useEffect(() => {
+    if (labels.length <= 1) {
+      setLabel(labels[0] ?? DEFAULT_RUNNING_LABELS)
+      return
+    }
+    const rotate = (): void => {
+      setLabel(current => chooseRunningLabel(labels, current))
+    }
+    setLabel(current => chooseRunningLabel(labels, current))
+    const id = setInterval(rotate, RUNNING_LABEL_ROTATE_MS)
+    return () => { clearInterval(id) }
+  }, [labels])
+
   const [mountedAt] = useState(() => Date.now())
   // Anchored to turn/start so a mid-turn reload keeps the real
   // elapsed time and the final footer's Ran-for label matches this clock.
@@ -181,7 +212,7 @@ function TurnStatus({ startTime, t }: {
   const showClock = elapsedMs >= 15_000
   return (
     <div className={css.turnStatus} role="status" aria-live="polite">
-      Deep diving...
+      {label}
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
           {formatRunDuration(elapsedMs, t)}
@@ -197,7 +228,7 @@ function TurnStatus({ startTime, t }: {
  */
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, displayMode: displayModeSource, t,
+  fileMentions, displayMode: displayModeSource, runningLabels: runningLabelsSource, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
@@ -216,6 +247,15 @@ export function ChatView({
     displayModeSource === undefined ? ABSENT_DISPLAY_READ : () => displayModeSource.getSnapshot(),
     ABSENT_DISPLAY_READ,
   )
+  const runningLabels = useSyncExternalStore(
+    runningLabelsSource === undefined ? ABSENT_RUNNING_LABELS_SUBSCRIBE : onStoreChange => runningLabelsSource.subscribe(onStoreChange),
+    runningLabelsSource === undefined ? ABSENT_RUNNING_LABELS_READ : () => runningLabelsSource.getSnapshot(),
+    ABSENT_RUNNING_LABELS_READ,
+  )
+  const statusLabels = useMemo(() => {
+    const labels = parseRunningLabels(runningLabels)
+    return labels.length === 0 ? [DEFAULT_RUNNING_LABELS] : labels
+  }, [runningLabels])
   const toolFoldGroups = useMemo(() => {
     const groups = new Map<string, { first: boolean; count: number }>()
     if (displayMode !== 'fold') return groups
@@ -582,7 +622,7 @@ export function ChatView({
               double-render the same wait. */}
           {/* Turn-level loading signal: rides the whole running turn (first-token
               wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
+          {running && <TurnStatus startTime={runningTurnStart} labels={statusLabels} t={t} />}
           {pendingSteering.map(item => (
             <PendingSteeringBubble key={item.id} content={item.content} loadImage={loadImage} t={t} />
           ))}

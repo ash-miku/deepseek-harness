@@ -722,6 +722,8 @@ export interface ChatViewInjected {
    * view owns no settings dependency so it can render standalone.
    */
   displayMode?: HostObservable<ConversationProcessDisplayMode> | undefined
+  /** Newline-separated running-status labels; absent compositions keep the default. */
+  runningLabels?: HostObservable<string> | undefined
 }
 
 /** Full chat-view component props: runtime & its Tool/command/tail render shares & store & injected & locale seat. */

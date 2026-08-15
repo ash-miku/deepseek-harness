@@ -29,6 +29,8 @@ import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
 import { DisplayModeRow } from './settings/DisplayModeRow.tsx'
 import type { DisplayModeRowInjected } from './settings/DisplayModeRow.tsx'
+import { RunningLabelRow } from './settings/RunningLabelRow.tsx'
+import type { RunningLabelRowInjected } from './settings/RunningLabelRow.tsx'
 import { ConversationDisplayPreference } from './display-preference.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { StatsLine } from './chat/StatsLine.tsx'
@@ -160,6 +162,17 @@ export function apply(ctx: Context): void {
       setBusyEnter: (behavior) => { submissionPolicy.setBusyEnter(behavior) },
     }),
   }, EnterBehaviorRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'conversation-running-label',
+    order: 30,
+    locale: NS,
+    inject: (): RunningLabelRowInjected => ({
+      hooks: { runningLabels: displayPreference.runningLabels },
+      setRunningLabels: (labels) => { displayPreference.setRunningLabels(labels) },
+    }),
+  }, RunningLabelRow))
 
   // Chat semantic reader positions by session, surviving view switches and
   // width reflow when the tab ring remounts the view. Deliberately not
@@ -409,6 +422,7 @@ export function apply(ctx: Context): void {
         },
         fileMentions: owner => ctx.get('chatFileMentions')?.forClosing(owner),
         displayMode: displayPreference.displayMode,
+        runningLabels: displayPreference.runningLabels,
         openFile: (path) => {
           const cwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
           void workspaces.openPath(resolveWorkspacePath(cwd, path)).catch(() => {

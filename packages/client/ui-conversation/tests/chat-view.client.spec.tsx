@@ -919,6 +919,32 @@ describe('ChatView', () => {
     expect(view.getByRole('status').textContent).toBe('Deep diving...')
   })
 
+  it('uses the configured running label', () => {
+    const h = makeHarness({ running: true })
+    h.props.runningLabels = createSnapshotStore('Working hard...')
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByRole('status').textContent).toBe('Working hard...')
+  })
+
+  it('rotates configured running labels without repeating the current one', () => {
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness({ running: true })
+      h.props.runningLabels = createSnapshotStore('One\nTwo')
+      const view = render(<h.ChatView {...h.props} />)
+      const status = view.getByRole('status')
+      const first = status.textContent ?? ''
+      expect(['One', 'Two']).toContain(first)
+
+      act(() => { vi.advanceTimersByTime(5_001) })
+      const second = status.textContent ?? ''
+      expect(second).not.toBe(first)
+      expect(['One', 'Two']).toContain(second)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('keeps the Tool renderer mounted when a running call settles into log order', () => {
     const mounted = vi.fn()
     const unmounted = vi.fn()
