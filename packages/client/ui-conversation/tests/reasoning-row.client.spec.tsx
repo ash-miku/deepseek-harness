@@ -114,4 +114,53 @@ describe('ReasoningRow', () => {
     expect(view.container.querySelector('[class*="ioCard"]')).toBeNull()
     expect(view.container.querySelector('[class*="thinkBody"]')).not.toBeNull()
   })
+
+  it('conclusion mode hides reasoning and keeps only the final answer', () => {
+    const view = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[
+          { kind: 'reasoning', text: 'Inspect the session' },
+          { kind: 'text', text: 'Here is the answer.' },
+        ]}
+        streaming={false}
+        displayMode="conclusion"
+      />,
+    )
+    expect(view.queryByText('Think')).toBeNull()
+    expect(view.queryByText('Inspect the session')).toBeNull()
+    expect(view.getByText('Here is the answer.')).toBeTruthy()
+  })
+
+  it('conclusion mode returns no shell for reasoning-only nodes', () => {
+    const view = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[{ kind: 'reasoning', text: 'Inspect the session' }]}
+        streaming={false}
+        displayMode="conclusion"
+      />,
+    )
+    expect(view.container.querySelector('[class*="root"]')).toBeNull()
+  })
+
+  it('fold mode merges multiple reasoning blocks into one Think row', () => {
+    const view = render(
+      <AssistantMarkdown
+        t={t}
+        blocks={[
+          { kind: 'reasoning', text: 'First thought' },
+          { kind: 'reasoning', text: 'Second thought' },
+          { kind: 'text', text: 'Answer.' },
+        ]}
+        streaming={false}
+        displayMode="fold"
+      />,
+    )
+    expect(view.getAllByRole('button')).toHaveLength(1)
+    expect(view.queryByText('Second thought')).toBeNull()
+    fireEvent.click(view.getByText('Think'))
+    expect(view.getByText(/First thought/)).toBeTruthy()
+    expect(view.getByText(/Second thought/)).toBeTruthy()
+  })
 })

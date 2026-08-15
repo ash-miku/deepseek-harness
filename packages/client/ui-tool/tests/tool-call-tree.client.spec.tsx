@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /** ToolCallTree-owned root/subcall markers and selection projection. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import type { ConversationSnapshot, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -21,6 +21,8 @@ const root = (callId: string, call: ToolResultNode['call']): ToolResultNode => (
 function props(
   block: ToolResultNode,
   selectedCallId?: string,
+  displayMode?: 'full' | 'fold' | 'conclusion',
+  foldGroup?: { first: boolean; count: number },
 ): ToolTreeProps {
   const snapshot = {} as ConversationSnapshot
   const useSession = ((selector: (value: ConversationSnapshot) => unknown) => selector(snapshot)) as ToolTreeProps['useSession']
@@ -40,6 +42,8 @@ function props(
       data: { root: block },
     },
     selectedCallId,
+    ...(displayMode === undefined ? {} : { displayMode }),
+    ...(foldGroup === undefined ? {} : { foldGroup }),
     openFile: vi.fn(),
     inspectCall: vi.fn(),
     forkAt: vi.fn(),
@@ -77,5 +81,35 @@ describe('ToolCallTree', () => {
     expect(view.container.querySelector('[data-chat-call-id="parent:code:1"]')?.hasAttribute('data-selected')).toBe(false)
     expect(view.container.querySelector('[data-chat-call-id="parent:code:1:code:1"]')?.getAttribute('data-selected')).toBe('true')
     expect(nests).toHaveLength(2)
+  })
+
+  it('renders nothing in conclusion-only mode', () => {
+    const block = root('w1', null)
+    const view = render(<ToolCallTree {...props(block, 'w1', 'conclusion')} />)
+    expect(view.container.querySelector('[data-chat-call-id]')).toBeNull()
+    expect(view.container.querySelector('[data-fold-process]')).toBeNull()
+  })
+
+  it('folds the tree behind one disclosure and reveals tool rows on demand', () => {
+    const block = root('w1', { name: 'read', argsRaw: '{"path":"a.ts"}' })
+    const view = render(<ToolCallTree {...props(block, 'w1', 'fold')} />)
+    expect(view.getByText('工具调用')).toBeTruthy()
+    expect(view.getByText('1 次调用')).toBeTruthy()
+    expect(view.container.querySelector('[data-chat-call-id="w1"]')).toBeNull()
+
+    fireEvent.click(view.getByText('工具调用'))
+    expect(view.container.querySelector('[data-chat-call-id="w1"]')).not.toBeNull()
+  })
+
+  it('uses aggregate counts and hides non-first tool rows in fold mode', () => {
+    const first = root('w1', null)
+    const firstView = render(<ToolCallTree {...props(first, 'w1', 'fold', { first: true, count: 3 })} />)
+    expect(firstView.getByText('3 次调用')).toBeTruthy()
+    cleanup()
+
+    const second = root('w2', null)
+    const secondView = render(<ToolCallTree {...props(second, 'w2', 'fold', { first: false, count: 3 })} />)
+    expect(secondView.container.querySelector('[data-fold-process]')).toBeNull()
+    expect(secondView.container.querySelector('[data-chat-call-id]')).toBeNull()
   })
 })

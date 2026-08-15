@@ -12,7 +12,7 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
@@ -22,6 +22,9 @@ import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
+
+const ABSENT_DISPLAY_SUBSCRIBE = (): (() => void) => () => {}
+const ABSENT_DISPLAY_READ = () => 'full' as const
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -145,7 +148,7 @@ function TurnStatus({ startTime, t }: {
  */
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, t,
+  fileMentions, displayMode: displayModeSource, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
@@ -159,6 +162,30 @@ export function ChatView({
   const hasMore = useSession(s => s.hasMore)
   const loadingOlder = useSession(s => s.loadingOlder)
   const selectedCallId = useStore(s => s.selection?.callId)
+  const displayMode = useSyncExternalStore(
+    displayModeSource === undefined ? ABSENT_DISPLAY_SUBSCRIBE : onStoreChange => displayModeSource.subscribe(onStoreChange),
+    displayModeSource === undefined ? ABSENT_DISPLAY_READ : () => displayModeSource.getSnapshot(),
+    ABSENT_DISPLAY_READ,
+  )
+  const foldGroups = useMemo(() => {
+    const groups = new Map<string, { first: boolean; count: number }>()
+    if (displayMode !== 'fold') return groups
+    for (const key of order) {
+      const node = nodeStore.get(key)
+      if (node?.kind !== 'tool-call') continue
+      const turn = node.location.kind === 'turn' || node.location.kind === 'step'
+        ? node.location.turn.turn
+        : 0
+      const groupKey = `tool:${turn}`
+      const current = groups.get(groupKey)
+      if (current === undefined) {
+        groups.set(groupKey, { first: true, count: 1 })
+      } else {
+        groups.set(groupKey, { first: false, count: current.count + 1 })
+      }
+    }
+    return groups
+  }, [displayMode, order, nodeStore])
 
   const pendingSteering = useMemo(
     () => inbox.filter(item => item.placement === 'steering'),
@@ -386,6 +413,8 @@ export function ChatView({
               useSession={useSession}
               selectedCallId={selectedCallId}
               cwd={cwd}
+              displayMode={displayMode}
+              foldGroup={foldGroups.get(nodeKey)}
               openFile={openFile}
               inspectCall={inspectCall}
               forkAt={forkAt}

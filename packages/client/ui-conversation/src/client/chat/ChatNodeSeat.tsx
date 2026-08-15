@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react'
 import { JsonBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatNode } from '../contract/chat-nodes.ts'
+import type { ConversationProcessDisplayMode } from '../../submission-settings.ts'
 import css from './ChatView.module.css'
 
 interface ChatNodeSeatProps extends ChatNodeOwnerProps {
@@ -9,6 +10,8 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly useSession: ChatViewSlotProps['useSession']
   readonly renderSlot: ChatViewSlotProps['renderSlot']
   readonly t: ChatViewSlotProps['t']
+  readonly displayMode?: ConversationProcessDisplayMode | undefined
+  readonly foldGroup?: ChatNodeOwnerProps['foldGroup'] | undefined
 }
 
 type RoutedChatNodeOwner = {
@@ -17,7 +20,7 @@ type RoutedChatNodeOwner = {
 
 /** Subscribe and dispatch one stable Context key without observing sibling Nodes. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, selectedCallId, cwd, openFile, inspectCall, forkAt,
+  nodeKey, selectedCallId, cwd, displayMode, foldGroup, openFile, inspectCall, forkAt,
   loadImage, fileMentions, useSession, renderSlot, t,
 }: ChatNodeSeatProps) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey))
@@ -27,12 +30,14 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     : {
       selectedCallId,
       cwd,
+      ...(displayMode === undefined ? {} : { displayMode }),
+      ...(foldGroup === undefined ? {} : { foldGroup }),
       openFile,
       inspectCall,
       forkAt,
       loadImage,
       fileMentions,
-    }, [node, selectedCallId, cwd, openFile, inspectCall, forkAt, loadImage, fileMentions])
+    }, [node, selectedCallId, cwd, displayMode, foldGroup, openFile, inspectCall, forkAt, loadImage, fileMentions])
   if (routedNode === undefined || owner === null) return null
   // Runtime dispatch owns the correlation: every Node's discriminant is the
   // keyed-slot entry passed alongside that same Node. TypeScript does not

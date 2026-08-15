@@ -1,6 +1,7 @@
 /** Root/subcall Tool composition with one keyed atomic dispatch path. */
-import { memo, useMemo, type ReactNode } from 'react'
+import { memo, useMemo, useState, type ReactNode } from 'react'
 import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
+import { DisclosureRow, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolCallOwnerProps, ToolTreeProps } from '../contract/slots.ts'
 import { GenericToolCard } from './toolviews/GenericToolCard.tsx'
 import css from './ToolCallTree.module.css'
@@ -8,6 +9,11 @@ import css from './ToolCallTree.module.css'
 /** Resolve a Tool call's wire name from either lifecycle form. */
 function callName(node: ToolCallBlock): string {
   return 'kind' in node ? node.call?.name ?? '' : node.name
+}
+
+/** Count a root call and every recursive subcall for folded summaries. */
+function callCount(block: ToolCallBlock): number {
+  return 1 + block.subCalls.reduce((total, child) => total + callCount(child), 0)
 }
 
 /** One atomic call dispatched through the Tool-owned keyed slot. */
@@ -87,11 +93,49 @@ const ToolCallBranch = memo(function ToolCallBranch({
  * @param props - whole-Tool owner data and the Tool-owned child-slot share.
  * @returns the Tool call tree.
  */
+/** One compact fold row that reveals the full tool tree on demand. */
+function ProcessDisclosure({ count, children, t }: {
+  count: number
+  children: ReactNode
+  t: ToolTreeProps['t']
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={css.foldSummary} data-fold-process>
+      <DisclosureRow
+        rowClassName={css.foldRow}
+        leadingClassName={css.foldLeading}
+        titleClassName={css.foldTitle}
+        chevronClassName={css.foldChevron}
+        icon={<IconThinkOutline14 size={14} />}
+        title={t('process.toolTitle')}
+        open={open}
+        expandable
+        expandOnRowClick
+        onToggle={() => { setOpen(value => !value) }}
+        collapsedContent={(
+          <span className={css.foldSummaryText}>{t('process.toolCount', { count })}</span>
+        )}
+      >
+        <div className={css.foldBody}>{children}</div>
+      </DisclosureRow>
+    </div>
+  )
+}
+
+/**
+ * Render one root Tool call and its recursive children through the same
+ * keyed atomic dispatch.
+ * @param props - whole-Tool owner data and the Tool-owned child-slot share.
+ * @returns the Tool call tree.
+ */
 export function ToolCallTree({
-  renderSlot, node, selectedCallId, cwd, openFile, inspectCall, t,
+  renderSlot, node, selectedCallId, cwd, displayMode, foldGroup, openFile, inspectCall, t,
 }: ToolTreeProps) {
   const block = node.data.root
-  return (
+  const mode = displayMode ?? 'full'
+  if (mode === 'conclusion') return null
+  const fullTree = (
     <ToolCallBranch
       renderSlot={renderSlot}
       block={block}
@@ -102,4 +146,9 @@ export function ToolCallTree({
       t={t}
     />
   )
+  if (mode === 'fold') {
+    if (foldGroup?.first === false) return null
+    return <ProcessDisclosure count={foldGroup?.count ?? callCount(block)} t={t}>{fullTree}</ProcessDisclosure>
+  }
+  return fullTree
 }

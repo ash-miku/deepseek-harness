@@ -2,7 +2,7 @@
 import type { ReactNode, RefObject } from 'react'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {
-  InjectFace, MaybeSnapshotSelectorHook, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
+  HostObservable, InjectFace, MaybeSnapshotSelectorHook, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
   SlotHookFactory, SnapshotSelectorHook,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
@@ -21,6 +21,7 @@ import type { createChatStore } from '../stores.ts'
 import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type { CallId, SelectionTarget, ViewTab } from './views.ts'
+import type { ConversationProcessDisplayMode } from '../../submission-settings.ts'
 
 /** Browser-owned image that has not crossed the durable host boundary. */
 export interface ComposerAttachment {
@@ -358,6 +359,15 @@ export interface ChatNodeOwnerProps {
   selectedCallId?: CallId | undefined
   /** Session workspace root; Tool summaries display paths relative to it. */
   cwd?: string | undefined
+  /** Chat process density; absent/legacy renderers keep full detail. */
+  displayMode?: ConversationProcessDisplayMode | undefined
+  /** Fold-mode grouping for Tool rows: one summary per turn. */
+  foldGroup?: {
+    /** Whether this node owns the turn's visible summary. */
+    first: boolean
+    /** Number of Tool roots collapsed into the summary. */
+    count: number
+  } | undefined
   openFile: (path: string) => void
   inspectCall: (callId: CallId) => void
   forkAt: (seq: number) => void
@@ -705,6 +715,11 @@ export interface ChatViewInjected {
    * absent or the turn produced nothing worth linking.
    */
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
+  /**
+   * Chat process-display source; absent compositions keep full detail. The
+   * view owns no settings dependency so it can render standalone.
+   */
+  displayMode?: HostObservable<ConversationProcessDisplayMode> | undefined
 }
 
 /** Full chat-view component props: runtime & its Tool/command/tail render shares & store & injected & locale seat. */

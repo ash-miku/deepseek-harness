@@ -12,6 +12,7 @@
 import { memo, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import type { AssistantBlock } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConversationProcessDisplayMode } from '../../submission-settings.ts'
 import { JsonBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ImageGallery, type ImageLoader } from '@deepseek-ai/dsh-client-ui-attachment'
@@ -31,25 +32,42 @@ export interface AssistantMarkdownProps {
   mentions?: MarkdownFileMentions | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
   t: ChatViewSlotProps['t']
+  /** Chat process density; absent callers keep full detail. */
+  displayMode?: ConversationProcessDisplayMode | undefined
 }
 
 /** Reasoning block as the Think variant summary row (figma 39:28304). */
 export const AssistantMarkdown = memo(function AssistantMarkdown({
-  blocks, streaming, interrupted, loadImage, mentions, t,
+  blocks, streaming, interrupted, loadImage, mentions, t, displayMode,
 }: AssistantMarkdownProps) {
   const imageLoader = loadImage ?? (() => Promise.reject(new Error(t('image.serviceUnavailable'))))
+  const mode = displayMode ?? 'full'
   // Stable per locale revision (t identity changes on switch): a fresh object
   // per render would rebuild MarkdownText's component table every chunk.
   const codeLabels = useMemo(() => ({ copyLabel: t('copy'), copiedLabel: t('copied') }), [t])
   const last = blocks.length - 1
+  const reasoningBlocks = blocks.filter(block => block.kind === 'reasoning')
+  const foldedReasoning = mode === 'fold' && reasoningBlocks.length > 0
+    ? reasoningBlocks.map(block => block.text).join('\n\n')
+    : null
   // Tool-call heads render as tool rows in the chat view's grouping pass, so
   // a node that is only those heads (or empty) would paint an empty root
   // between tool groups — skip the shell unless something visible remains.
-  const hasVisible = streaming
-    || interrupted === true
-    || blocks.some(block => block.kind !== 'tool-call')
+  const hasVisible = mode === 'conclusion'
+    ? interrupted === true || blocks.some(block => block.kind !== 'reasoning' && block.kind !== 'tool-call')
+    : streaming || interrupted === true || blocks.some(block => block.kind !== 'tool-call')
   if (!hasVisible) return null
   const rendered: ReactNode[] = []
+  if (foldedReasoning !== null) {
+    rendered.push(
+      <ReasoningRow
+        key="folded-reasoning"
+        text={foldedReasoning}
+        running={streaming && blocks[last]?.kind === 'reasoning'}
+        t={t}
+      />,
+    )
+  }
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i]
     if (block === undefined) continue
@@ -66,7 +84,9 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         )
         break
       case 'reasoning':
-        rendered.push(<ReasoningRow key={i} text={block.text} running={streaming && i === last} t={t} />)
+        if (mode === 'full') {
+          rendered.push(<ReasoningRow key={i} text={block.text} running={streaming && i === last} t={t} />)
+        }
         break
       case 'image': {
         // Consecutive image blocks share one gallery so several images tile
