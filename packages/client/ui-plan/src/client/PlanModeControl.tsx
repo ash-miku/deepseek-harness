@@ -12,13 +12,15 @@ export type PlanChipProps =
   PropsRuntime<'conversation.input.plan'> & InjectFace<PlanChipInjected> & PropsLocale<'plan'>
 
 /**
- * Plan-mode status over the host-computed `plan` projection. The chip renders
- * only while the effective target is plan mode (`pending ? !active : active`
- * — a folded host value, not client optimism) and executes /plan off.
+ * Plan-mode toggle over the host-computed `plan` projection. The chip renders
+ * whenever plan mode is available (`pending ? !active : active` is the
+ * effective target — a folded host value, not client optimism), so inactive
+ * sessions expose the same visible Plan affordance as active ones.
  */
-export function PlanChip({ useProjection, locked, exitPlanMode, t }: PlanChipProps) {
+export function PlanChip({ useProjection, locked, setPlanMode, t }: PlanChipProps) {
   const plan = useProjection('plan')
-  const [leaving, setLeaving] = useState(false)
+  const [pendingTarget, setPendingTarget] = useState<boolean | null>(null)
+  const [rpcBusy, setRpcBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const aliveRef = useRef(true)
 
@@ -29,22 +31,36 @@ export function PlanChip({ useProjection, locked, exitPlanMode, t }: PlanChipPro
     }
   }, [])
 
+  // Keep the button locked until the host projection confirms the requested
+  // state. Without this, a click landing after the RPC settles but before the
+  // projection frame arrives would toggle from a stale target and send the
+  // wrong /plan command.
+  useEffect(() => {
+    if (plan === undefined || pendingTarget === null) return
+    const target = plan.pending ? !plan.active : plan.active
+    if (target === pendingTarget) setPendingTarget(null)
+  }, [pendingTarget, plan])
+
   if (plan === undefined) return null
   const target = plan.pending ? !plan.active : plan.active
-  if (!target) return null
+  const busy = rpcBusy
 
-  const off = (): void => {
-    // No leaving/locked guard: both disable the button, so no click arrives.
-    setLeaving(true)
+  const toggle = (): void => {
+    // No busy/locked guard: both disable the button, so no click arrives.
+    const requested = !target
+    setPendingTarget(requested)
+    setRpcBusy(true)
     setError(null)
-    void exitPlanMode().then((failure) => {
+    void setPlanMode(requested).then((failure) => {
       if (!aliveRef.current) return
-      setLeaving(false)
+      if (failure !== null) setPendingTarget(null)
       setError(failure)
     }, (reason: unknown) => {
       if (!aliveRef.current) return
-      setLeaving(false)
+      setPendingTarget(null)
       setError(reason instanceof Error ? reason.message : String(reason))
+    }).finally(() => {
+      if (aliveRef.current) setRpcBusy(false)
     })
   }
 
@@ -52,20 +68,26 @@ export function PlanChip({ useProjection, locked, exitPlanMode, t }: PlanChipPro
     <span className={css.wrap}>
       <button
         type="button"
-        className={css.chip}
-        aria-label={t('chip.on.aria')}
-        title={t('chip.on.title')}
-        disabled={locked || leaving}
-        onClick={off}
+        className={target ? css.chip : css.chipInactive}
+        aria-label={t(target ? 'chip.on.aria' : 'chip.off.aria')}
+        title={t(target ? 'chip.on.title' : 'chip.off.title')}
+        disabled={locked || busy}
+        onClick={toggle}
       >
         {/* Design literal, not copy: the chip wordmark stays 'Plan' in every locale. */}
-        Plan
-        <span className={css.close} aria-hidden>
-          <IconCloseFill14 size={12} />
-        </span>
+        <span className={css.label}>Plan</span>
+        {target && (
+          <span className={css.close} aria-hidden>
+            <IconCloseFill14 size={12} />
+          </span>
+        )}
       </button>
       {/* Failure copy stays English (error-surface policy: not localized). */}
-      {error !== null && <span className={css.error} role="status" title={error}>failed to exit plan mode</span>}
+      {error !== null && (
+        <span className={css.error} role="status" title={error}>
+          {target ? 'failed to exit plan mode' : 'failed to enter plan mode'}
+        </span>
+      )}
     </span>
   )
 }

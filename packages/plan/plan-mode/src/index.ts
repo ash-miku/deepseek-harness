@@ -138,6 +138,24 @@ export function foldPlanMode(events: readonly SessionEvent[], end = events.lengt
 }
 
 /**
+ * The latest logged `/plan` selection that has not been resolved by a
+ * `plan/mode` commit, or `undefined` when no selection is outstanding.
+ * This is the durable counterpart of the in-memory pending intent; command
+ * handlers log the selection before the boundary that commits it.
+ */
+function outstandingPlanSelection(events: readonly SessionEvent[]): boolean | undefined {
+  let selection: boolean | undefined
+  for (const event of events) {
+    if (event.type === 'plan/mode') {
+      selection = undefined
+    } else if (event.type === 'command/run' && event.data.name === 'plan' && event.data.args !== undefined) {
+      selection = event.data.args.trim() !== 'off'
+    }
+  }
+  return selection
+}
+
+/**
  * Projection unit state: the logged mode plus the latest logged `/plan`
  * selection (`command/run`) not yet resolved by a `plan/mode` commit. Plain
  * JSON (persisted-cache precondition).
@@ -206,6 +224,12 @@ export class PlanModeController extends Service {
       { agent, signal },
       next,
     ): Promise<PreStepDecision> => {
+      // Drop a stale in-memory intent before the prompt is assembled. The
+      // durable command log is authoritative once a /plan command has been
+      // resolved by plan/mode; otherwise a rapid on/off sequence can leave a
+      // stuck active intent that shapes the next request even though the UI
+      // and session log both report plan mode off.
+      this.reconcilePending(agent.session)
       const decision = await next()
       const pending = this.pendingIntents.get(agent.session)
       if (decision.kind === 'reject' || signal.aborted || pending === undefined) return decision
@@ -427,6 +451,7 @@ export class PlanModeController extends Service {
     const pending = this.pendingIntents.get(session)
     const target = pending?.active ?? foldPlanMode(session.events)
     if (active === target) return 'noop'
+    this.retractPlanNarrations(agent)
     if (hasOpenTurn(session.events)) {
       this.pendingIntents.set(session, { active, narrate: true })
       return foldPlanMode(session.events) === active ? 'cancelled' : 'queued'
@@ -442,6 +467,45 @@ export class PlanModeController extends Service {
     const narration = this.narration(session, active)
     if (narration !== undefined) agent.inject(narration)
     return 'committed'
+  }
+
+  /**
+   * Drop stale in-memory pending intents before prompt assembly. The durable
+   * command log is authoritative once a /plan command has been resolved by
+   * plan/mode; otherwise a rapid on/off sequence can leave a stuck active
+   * intent that shapes the next request even though the UI and session log
+   * both report plan mode off.
+   */
+  private reconcilePending(session: Session): void {
+    const pending = this.pendingIntents.get(session)
+    if (pending === undefined) return
+    const selection = outstandingPlanSelection(session.events)
+    if (selection !== undefined) {
+      if (pending.active !== selection) {
+        this.pendingIntents.set(session, { active: selection, narrate: pending.narrate })
+      }
+      return
+    }
+    const hasPlanCommand = session.events.some(event =>
+      event.type === 'command/run' && event.data.name === 'plan')
+    if (hasPlanCommand) this.pendingIntents.delete(session)
+  }
+
+  /**
+   * Remove still-pending plan-mode notices before a state change. Between
+   * turns a committed on/off sequence can otherwise leave stale "switched to
+   * plan mode" context in the inbox after the final state is off.
+   */
+  private retractPlanNarrations(agent: Agent): void {
+    const inbox = (agent as unknown as {
+      inbox?: { nextStep: readonly UserMessage[]; nextTurn: readonly UserMessage[]; remove(id: string): boolean }
+    }).inbox
+    if (inbox === undefined) return
+    for (const message of [...inbox.nextStep, ...inbox.nextTurn]) {
+      if (message.source.kind === 'plugin' && message.source.plugin === 'plan-mode') {
+        inbox.remove(message.id)
+      }
+    }
   }
 
   /** Append one pending selection before the next request assembly. */

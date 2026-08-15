@@ -1,9 +1,9 @@
 /**
  * Plan control plugin, browser half: occupies the composer's named
- * `conversation.input.plan` seat with an active-state status chip. Plan mode
- * is entered through the command source; while the projection's effective
- * target is plan mode the chip renders and executes /plan off through
- * `command.execute`, otherwise the seat stays empty. Reads ride the generic
+ * `conversation.input.plan` seat with a visible plan-mode toggle. Plan mode
+ * is entered and left through the same /plan command path; whenever the host
+ * projection is present, the chip renders and calls `setPlanMode` through
+ * `command.execute`. Reads ride the generic
  * projection pair through the standard-kit `useProjection`; zero client-side
  * plan state.
  */
@@ -33,10 +33,11 @@ const NS = 'plan'
 /** Injected business face of the composer plan seat. */
 export interface PlanChipInjected {
   /**
-   * Leave plan mode by executing /plan off.
+   * Enter or leave plan mode by executing /plan or /plan off.
+   * @param active - true to enter plan mode, false to leave it.
    * @returns null on admitted execution; a user-visible failure line otherwise.
    */
-  exitPlanMode: () => Promise<string | null>
+  setPlanMode: (active: boolean) => Promise<string | null>
 }
 
 /** Required services: the seat's slot registry, commands Remote, and locale registry. */
@@ -54,10 +55,11 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: (sessionId: SessionId): PlanChipInjected => ({
       // Failure strings stay English (error-surface policy: not localized).
-      exitPlanMode: async () => {
-        const result = await ctx.remote.commands.execute(sessionId, '/plan off')
+      setPlanMode: async (active) => {
+        const line = active ? '/plan' : '/plan off'
+        const result = await ctx.remote.commands.execute(sessionId, line)
         if (!result.ok) return `${result.error.message} (${result.error.code})`
-        if (result.value === undefined) return 'unknown command: /plan off'
+        if (result.value === undefined) return `unknown command: ${line}`
         return null
       },
     }),

@@ -59,7 +59,7 @@ describe('ui-plan browser apply', () => {
     expect(ctx.slots.entries('conversation.input.plan')).toHaveLength(1)
   })
 
-  it('registers the chip, executes /plan off, and unregisters on teardown', async () => {
+  it('registers the chip, executes /plan and /plan off, and unregisters on teardown', async () => {
     const b = await bench()
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
@@ -67,8 +67,11 @@ describe('ui-plan browser apply', () => {
     expect(entry.component).toBe(PlanChip)
     const injected = (entry.inject as unknown as (id: SessionId) => PlanChipInjected)(SID)
 
-    await expect(injected.exitPlanMode()).resolves.toBeNull()
+    await expect(injected.setPlanMode(false)).resolves.toBeNull()
     expect(b.execute).toHaveBeenLastCalledWith(SID, '/plan off')
+
+    await expect(injected.setPlanMode(true)).resolves.toBeNull()
+    expect(b.execute).toHaveBeenLastCalledWith(SID, '/plan')
 
     // Business failure folds to the composer-visible line: the generated method
     // reports the RPC failure in its error branch.
@@ -76,11 +79,11 @@ describe('ui-plan browser apply', () => {
       ok: false,
       error: { code: 'session-not-found', message: 'gone', details: {} },
     } as never)
-    await expect(injected.exitPlanMode()).resolves.toBe('gone (session-not-found)')
+    await expect(injected.setPlanMode(false)).resolves.toBe('gone (session-not-found)')
 
     // Unmatched admission (plan-mode not composed host-side) is also a failure line.
     b.execute.mockResolvedValueOnce({ ok: true, value: undefined } as never)
-    await expect(injected.exitPlanMode()).resolves.toBe('unknown command: /plan off')
+    await expect(injected.setPlanMode(true)).resolves.toBe('unknown command: /plan')
 
     await fiber.dispose()
     expect(b.slots.entries('conversation.input.plan')).toHaveLength(0)

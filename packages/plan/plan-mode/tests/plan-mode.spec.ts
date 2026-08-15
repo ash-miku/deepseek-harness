@@ -9,7 +9,7 @@ import { createScope } from '@deepseek-ai/dsh-scope'
 import UserQuestionService, {
   UserQuestionError, type AskUserQuestionRequest,
 } from '@deepseek-ai/dsh-user-questions'
-import CommandRuntime from '@deepseek-ai/dsh-commands'
+import CommandRuntime, { CommandId } from '@deepseek-ai/dsh-commands'
 import { CodeRuntime, type CodeRunRequest, type CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
 import PlanModeController, { EXIT_PLAN_MODE, foldPlanMode, resolveConfig } from '../src/index.ts'
 import type { PlanModeConfig } from '../src/index.ts'
@@ -394,6 +394,92 @@ describe('the boundary flush', () => {
     await boundary(ctx, agent, 'pre-step')
     expect(warn).toHaveBeenCalledOnce()
     expect(ctx.planMode.get(agent)).toEqual({ active: false, pending: true })
+  })
+})
+
+describe('narration retraction', () => {
+  it('removes queued plan-mode notices when a between-turns selection is reversed', async () => {
+    const ctx = await setup()
+    const agent = await agentWithSession(ctx, 'narration-retract')
+    header(agent.session)
+    const pending: UserMessage[] = []
+    const agentWithInbox = agent as unknown as {
+      inbox: { nextStep: readonly UserMessage[]; nextTurn: readonly UserMessage[]; remove(id: string): boolean }
+      inject(message: UserMessage): void
+    }
+    agentWithInbox.inbox = {
+      nextStep: pending,
+      nextTurn: [],
+      remove(id) {
+        const index = pending.findIndex(message => message.id === id)
+        if (index < 0) return false
+        pending.splice(index, 1)
+        return true
+      },
+    }
+    agentWithInbox.inject = (message) => { pending.push(message) }
+
+    ctx.planMode.set(agent, true)
+    ctx.planMode.set(agent, false)
+    ctx.planMode.set(agent, true)
+    ctx.planMode.set(agent, false)
+
+    expect(foldPlanMode(agent.session.events)).toBe(false)
+    expect(pending).toEqual([])
+  })
+
+  it('keeps exactly the final queued plan-mode notice after on/off/on', async () => {
+    const ctx = await setup()
+    const agent = await agentWithSession(ctx, 'narration-retain')
+    header(agent.session)
+    const pending: UserMessage[] = []
+    const agentWithInbox = agent as unknown as {
+      inbox: { nextStep: readonly UserMessage[]; nextTurn: readonly UserMessage[]; remove(id: string): boolean }
+      inject(message: UserMessage): void
+    }
+    agentWithInbox.inbox = {
+      nextStep: pending,
+      nextTurn: [],
+      remove(id) {
+        const index = pending.findIndex(message => message.id === id)
+        if (index < 0) return false
+        pending.splice(index, 1)
+        return true
+      },
+    }
+    agentWithInbox.inject = (message) => { pending.push(message) }
+
+    ctx.planMode.set(agent, true)
+    ctx.planMode.set(agent, false)
+    ctx.planMode.set(agent, true)
+
+    expect(foldPlanMode(agent.session.events)).toBe(true)
+    expect(pending).toHaveLength(1)
+    expect(pending[0]?.content).toEqual([{ type: 'text', text: 'The user switched this session to plan mode.' }])
+  })
+})
+
+describe('pending reconciliation', () => {
+  it('reconciles a stale command-driven pending intent before prompt assembly', async () => {
+    const ctx = await setup()
+    const agent = await agentWithSession(ctx)
+    openTurn(agent.session)
+    ctx.planMode.set(agent, true)
+    // Simulate the durable command log resolving on then off while the
+    // in-memory intent is still the stale on value from the old UI race.
+    agent.session.append('command/run', {
+      commandId: CommandId('stale-enter'), name: 'plan', args: '', source: { kind: 'user' },
+    })
+    agent.session.append('plan/mode', { active: true })
+    agent.session.append('command/run', {
+      commandId: CommandId('stale-exit'), name: 'plan', args: ' off', source: { kind: 'user' },
+    })
+    agent.session.append('plan/mode', { active: false })
+
+    await boundary(ctx, agent, 'pre-step')
+    expect(ctx.planMode.get(agent)).toEqual({ active: false })
+    const assembly = await assembleFor(ctx, agent)
+    expect(assembly.sections.find(section => section.name === 'plan:policy')?.text).toBe('')
   })
 })
 
