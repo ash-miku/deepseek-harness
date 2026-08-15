@@ -27,16 +27,9 @@
   justify-content: center;
 }
 
-.label {
-  font-variant-numeric: tabular-nums;
-}
-
+.label,
 .today {
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-  line-height: 18px;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .refresh {

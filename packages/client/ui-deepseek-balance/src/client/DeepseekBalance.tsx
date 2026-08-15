@@ -32,11 +32,12 @@ export function DeepseekBalance({ wide, useBalance, refresh, t }: DeepseekBalanc
   const failed = state.status === 'error'
 
   const amount = ready ? formatMoney(balance.currency, balance.totalBalance) : ''
+  const balanceLabel = ready ? t('balance.label') + ' ' + amount : ''
   const today = ready && balance.todayCost !== undefined && balance.todayCurrency !== undefined
     ? t('balance.today') + ' ' + formatMoney(balance.todayCurrency, balance.todayCost)
     : undefined
   const tooltip = ready
-    ? t('balance.label') + ': ' + amount + (today === undefined ? '' : ' · ' + today) + ' (' + t('balance.refresh') + ')'
+    ? amount + (today === undefined ? '' : ' · ' + today) + ' (' + t('balance.refresh') + ')'
     : failed ? t('balance.unavailable') + ' — ' + t('balance.refresh')
       : t('balance.refresh')
 
@@ -55,7 +56,7 @@ export function DeepseekBalance({ wide, useBalance, refresh, t }: DeepseekBalanc
         <Icon size={14} className={loading ? css.spin : undefined} />
         {wide && (
           <span className={css.label}>
-            {ready ? amount : failed ? t('balance.unavailable') : t('balance.loading')}
+            {ready ? balanceLabel : failed ? t('balance.unavailable') : t('balance.loading')}
           </span>
         )}
         {wide && today !== undefined && <span className={css.today}>{today}</span>}

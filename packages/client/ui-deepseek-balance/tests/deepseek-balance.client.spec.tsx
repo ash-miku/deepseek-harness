@@ -44,14 +44,14 @@ function mount(state: BalanceState, wide = true) {
 describe('DeepseekBalance', () => {
   it('renders the amount when ready (wide)', () => {
     mount(readyState(), true)
-    expect(screen.getByText('¥110.00')).toBeDefined()
+    expect(screen.getByText('Balance ¥110.00')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Refresh balance' }).getAttribute('data-status')).toBe('ready')
     expect(screen.queryByText(/Today/)).toBeNull()
   })
 
   it('renders today cost when the platform token is configured (wide)', () => {
     mount(readyState('0.80'), true)
-    expect(screen.getByText('¥110.00')).toBeDefined()
+    expect(screen.getByText('Balance ¥110.00')).toBeDefined()
     expect(screen.getByText('Today ¥0.80')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Refresh balance' }).getAttribute('data-has-today')).toBe('true')
   })
