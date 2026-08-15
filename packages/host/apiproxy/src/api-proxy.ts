@@ -1111,8 +1111,8 @@ const DEEPSEEK_BALANCE_URL = 'https://api.deepseek.com/user/balance'
 const DEEPSEEK_BALANCE_KEY_REF = 'DEEPSEEK_API_KEY'
 /** Optional platform session token enabling the private usage/cost endpoint. */
 const DEEPSEEK_PLATFORM_TOKEN_REF = 'DEEPSEEK_PLATFORM_TOKEN'
-/** Private platform usage endpoint; requires browser-like headers to pass the WAF. */
-const DEEPSEEK_COST_URL = 'https://platform.deepseek.com/api/v0/usage/cost'
+/** Private platform usage endpoint matching the official usage page; requires browser-like headers. */
+const DEEPSEEK_COST_URL = 'https://platform.deepseek.com/api/v0/usage/by_api_key/cost'
 const DEEPSEEK_COST_HEADERS = {
   Accept: 'application/json',
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -1125,56 +1125,48 @@ const DEEPSEEK_COST_HEADERS = {
 /** Host-side cache TTL for a balance reading (a settings-surface poll must not hammer upstream). */
 const DEEPSEEK_BALANCE_TTL_MS = 5 * 60_000
 
-/** One usage item of the private DeepSeek platform cost payload. */
-interface DeepseekUsageCostItem {
-  type?: string
-  amount?: string
+/** One hourly cost bucket of the platform by_api_key payload. */
+interface DeepseekUsageCostBucket {
+  time?: number
+  cost?: string
 }
 
-/** One model's cost rows for a date. */
-interface DeepseekUsageCostModel {
+/** One API-key/model series of the platform by_api_key payload. */
+interface DeepseekUsageCostSeries {
   model?: string
-  usage?: DeepseekUsageCostItem[]
+  buckets?: DeepseekUsageCostBucket[]
 }
 
-/** One calendar day of the private DeepSeek platform cost payload. */
-interface DeepseekUsageCostDay {
-  date?: string
-  data?: DeepseekUsageCostModel[]
-}
-
-/** Currency-bearing top level of the private DeepSeek platform cost payload. */
-interface DeepseekUsageCostBizData {
+/** Currency group of the platform by_api_key payload. */
+interface DeepseekUsageCostGroup {
   currency?: string
-  days?: DeepseekUsageCostDay[]
+  series?: DeepseekUsageCostSeries[]
 }
 
-/** Narrow wire shape of the private DeepSeek platform cost payload. */
+/** Narrow wire shape of the platform by_api_key cost payload. */
 interface DeepseekUsageCostResponse {
   code?: number
   data?: {
     biz_code?: number
-    biz_data?: DeepseekUsageCostBizData[]
+    biz_data?: {
+      data?: DeepseekUsageCostGroup[]
+    }
   }
 }
 
-/** Local calendar date in the platform payload's `YYYY-MM-DD` shape. */
-function deepseekDateString(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${date.getFullYear()}-${month}-${day}`
-}
-
 /**
- * Query the private platform cost endpoint for the current month and sum the
- * current day's cost rows. Browser-like headers are required by the platform
- * WAF even though the credential is a platform session token.
+ * Query the same platform usage endpoint the official page uses and sum the
+ * current local day's buckets. Browser-like headers and an aligned full-day
+ * range are required by the platform WAF.
  */
 async function fetchDeepseekTodayCost(platformToken: string): Promise<{ cost: string; currency: string }> {
   const now = new Date()
+  const startSec = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000)
+  const tzOffsetSec = -now.getTimezoneOffset() * 60
   const params = new URLSearchParams({
-    month: String(now.getMonth() + 1),
-    year: String(now.getFullYear()),
+    start: String(startSec),
+    end: String(startSec + 86_400),
+    tz: String(tzOffsetSec),
   })
   const response = await fetch(`${DEEPSEEK_COST_URL}?${params.toString()}`, {
     headers: { Authorization: `Bearer ${platformToken}`, ...DEEPSEEK_COST_HEADERS },
@@ -1190,16 +1182,15 @@ async function fetchDeepseekTodayCost(platformToken: string): Promise<{ cost: st
   if (data?.biz_code !== undefined && data.biz_code !== 0) {
     throw new Error(`DeepSeek usage request failed: biz_code ${data.biz_code}`)
   }
-  const bizData = data?.biz_data?.[0]
-  const today = bizData?.days?.find(day => day.date === deepseekDateString(now))
+  const groups = data?.biz_data?.data ?? []
+  const group = groups.find(candidate => candidate.currency === 'CNY') ?? groups[0]
   let cost = 0
-  for (const model of today?.data ?? []) {
-    for (const item of model.usage ?? []) {
-      if (item.type === 'REQUEST') continue
-      cost += Number.parseFloat(item.amount ?? '0') || 0
+  for (const series of group?.series ?? []) {
+    for (const bucket of series.buckets ?? []) {
+      cost += Number.parseFloat(bucket.cost ?? '0') || 0
     }
   }
-  return { cost: cost.toFixed(2), currency: bizData?.currency ?? 'CNY' }
+  return { cost: cost.toFixed(2), currency: group?.currency ?? 'CNY' }
 }
 
 export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiProxy {

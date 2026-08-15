@@ -76,33 +76,24 @@ function upstreamBalance(): Record<string, unknown> {
   }
 }
 
-function localDate(): string {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${now.getFullYear()}-${month}-${day}`
-}
-
 function upstreamTodayCost(cost = '0.50'): Record<string, unknown> {
   return {
     code: 0,
     data: {
       biz_code: 0,
-      biz_data: [{
-        currency: 'CNY',
-        days: [{
-          date: localDate(),
-          data: [{
+      biz_data: {
+        data: [{
+          currency: 'CNY',
+          series: [{
             model: 'deepseek-v4-flash',
-            usage: [
-              { type: 'PROMPT_CACHE_HIT_TOKEN', amount: '0.10' },
-              { type: 'PROMPT_CACHE_MISS_TOKEN', amount: '0.20' },
-              { type: 'RESPONSE_TOKEN', amount: cost },
-              { type: 'REQUEST', amount: '2' },
+            buckets: [
+              { time: 1786723200, cost: '0.10' },
+              { time: 1786726800, cost: '0.20' },
+              { time: 1786730400, cost },
             ],
           }],
         }],
-      }],
+      },
     },
   }
 }
@@ -179,7 +170,7 @@ describe('deepseek.balance', () => {
         expect(headers?.Authorization).toContain('Bearer sk-test')
         return upstreamResponse(200, upstreamBalance())
       }
-      expect(String(url)).toContain('/api/v0/usage/cost')
+      expect(String(url)).toContain('/api/v0/usage/by_api_key/cost')
       expect(headers?.Authorization).toContain('Bearer pt-test')
       expect(headers?.Origin).toBe('https://platform.deepseek.com')
       return upstreamResponse(200, upstreamTodayCost())
