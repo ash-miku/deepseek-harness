@@ -67,11 +67,13 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
   private disposed = false
   /** Mutable: a probe scope downgrades to `memory` on a fence refusal. */
   private persistence: 'host' | 'memory' | 'probe'
+  /** Whether this scope may retry Host persistence after a later trust handshake. */
+  private readonly retryableProbe: boolean
 
   /**
    * @param api - settings wire face.
    * @param spec - namespace identity and optional narrowing decoder.
-   * @param persistence - `memory` keeps remote pages process-local without any settings call; `probe` tries Host persistence and downgrades on a trust-fence refusal.
+   * @param persistence - memory keeps remote settings process-local; probe tries Host persistence and downgrades on a trust-fence refusal.
    */
   constructor(
     private readonly api: SettingsFace,
@@ -79,6 +81,7 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     persistence: 'host' | 'memory' | 'probe' = 'host',
   ) {
     this.persistence = persistence
+    this.retryableProbe = persistence === 'probe'
     this.store = createSnapshotStore<SettingsScopeSnapshot<T>>({
       status: persistence === 'memory' ? 'unavailable' : 'loading',
       value: undefined,
@@ -174,6 +177,24 @@ export class SettingsScopeController<T> implements SettingsScope<T> {
     this.readGeneration += 1
     this.writeGeneration += 1
     await this.tail
+  }
+
+  /**
+   * Reopen a probe scope that downgraded to memory after a fence refusal.
+   * Connection resets and a later Host-description handshake mean the trust
+   * fence may now accept this page, so one more probe is safe and bounded: a
+   * refusal downgrades it again.
+   */
+  retryProbe(): void {
+    if (this.disposed || !this.retryableProbe || this.persistence !== 'memory') return
+    this.persistence = 'probe'
+    this.readGeneration += 1
+    this.writeGeneration += 1
+    this.store.update((draft) => {
+      draft.status = 'loading'
+      draft.writable = false
+      draft.mode = 'host'
+    })
   }
 
   /**
@@ -308,12 +329,22 @@ export class SettingsScopeBinder extends Service {
     ctx.effect(() => {
       const refresh = (namespace?: string): void => {
         if (namespace !== undefined && namespace !== spec.namespace) return
+        if (!connection.isLoopback) controller.retryProbe()
         void controller.load()
       }
       const disposers = [
         (ctx.get('remote') as Context['remote']).$on('settings/document-updated', refresh),
         ctx.on('connection/reset', () => { refresh() }),
       ]
+      // A non-loopback page can request settings before its Host-description
+      // handshake has crossed the trust fence. Re-probe once that handshake
+      // lands so a boot-time 403 does not lock the scope into memory mode.
+      if (!connection.isLoopback && connection.hostDescription !== undefined) {
+        disposers.push(connection.hostDescription.subscribe(() => {
+          if (connection.hostDescription.getSnapshot() === undefined) return
+          refresh()
+        }))
+      }
       void controller.load()
       return async () => {
         for (const dispose of disposers) dispose()

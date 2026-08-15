@@ -431,6 +431,29 @@ describe('SettingsScopeBinder.bind', () => {
     await fiber.dispose()
   })
 
+  it('reopens a probe scope after a fence refusal when trust may have settled', async () => {
+    const describeCall = vi.fn()
+      .mockRejectedValueOnce(new Error('transport failure for /api/settings.describe: HTTP 403'))
+      .mockResolvedValueOnce(described({ preference: 'dark' }, 2))
+    const scope = new SettingsScopeController<UiTestSettings>(
+      { settings: { describe: describeCall } } as never,
+      { namespace: 'ui-test' },
+      'probe',
+    )
+    await scope.load()
+    expect(scope.getSnapshot()).toMatchObject({ status: 'unavailable', mode: 'memory', writable: false })
+    scope.retryProbe()
+    await scope.load()
+    expect(describeCall).toHaveBeenCalledTimes(2)
+    expect(scope.getSnapshot()).toMatchObject({
+      status: 'ready',
+      mode: 'host',
+      value: { preference: 'dark' },
+      revision: 2,
+      writable: true,
+    })
+  })
+
   it('persists a fence-accepted remote browser exactly like loopback', async () => {
     const describeCall = vi.fn().mockResolvedValue(described({ preference: 'system' }, 1))
     const mutate = vi.fn().mockResolvedValueOnce(ok(view({ preference: 'dark' }, 2)))
