@@ -1,7 +1,7 @@
 /**
  * DeepSeek account-balance surface: a compact footer action above Settings.
- * Wide renders an icon + label + amount; rail renders the icon alone. Clicking
- * forces a host-cache-bypassing re-read.
+ * Wide renders the balance plus today's official cost when available; rail
+ * renders the icon alone. Clicking forces a host-cache-bypassing re-read.
  */
 
 import {
@@ -11,17 +11,16 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 // Type-only: pulls the sidebar SlotMap merge (the footer.action entry).
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { DeepseekBalanceFace } from './slots.ts'
-import type { DeepseekBalanceView } from '@deepseek-ai/dsh-api-remotes/client'
 import css from './DeepseekBalance.module.css'
 
 /** Full component props composed by the sidebar footer-action slot. */
 export type DeepseekBalanceProps =
   PropsRuntime<'sidebar.footer.action'> & InjectFace<DeepseekBalanceFace> & PropsLocale<'deepseek-balance'>
 
-/** Render one balance reading as a compact amount string. */
-function formatAmount(balance: DeepseekBalanceView): string {
-  if (balance.currency === 'CNY') return '¥' + balance.totalBalance
-  return balance.totalBalance + ' ' + balance.currency
+/** Render a monetary amount with its currency symbol. */
+function formatMoney(currency: string, value: string): string {
+  if (currency === 'CNY') return '¥' + value
+  return value + ' ' + currency
 }
 
 /** Render the balance footer action. */
@@ -32,9 +31,12 @@ export function DeepseekBalance({ wide, useBalance, refresh, t }: DeepseekBalanc
   const loading = state.status === 'loading' || state.status === 'idle'
   const failed = state.status === 'error'
 
-  const amount = ready ? formatAmount(balance) : ''
+  const amount = ready ? formatMoney(balance.currency, balance.totalBalance) : ''
+  const today = ready && balance.todayCost !== undefined && balance.todayCurrency !== undefined
+    ? t('balance.today') + ' ' + formatMoney(balance.todayCurrency, balance.todayCost)
+    : undefined
   const tooltip = ready
-    ? t('balance.label') + ': ' + amount + ' (' + t('balance.refresh') + ')'
+    ? t('balance.label') + ': ' + amount + (today === undefined ? '' : ' · ' + today) + ' (' + t('balance.refresh') + ')'
     : failed ? t('balance.unavailable') + ' — ' + t('balance.refresh')
       : t('balance.refresh')
 
@@ -47,6 +49,7 @@ export function DeepseekBalance({ wide, useBalance, refresh, t }: DeepseekBalanc
         className={wide ? css.action : [css.action, css.rail].join(' ')}
         aria-label={t('balance.refresh')}
         data-status={ready ? 'ready' : failed ? 'error' : 'loading'}
+        data-has-today={today !== undefined || undefined}
         onClick={() => { refresh() }}
       >
         <Icon size={14} className={loading ? css.spin : undefined} />
@@ -55,6 +58,7 @@ export function DeepseekBalance({ wide, useBalance, refresh, t }: DeepseekBalanc
             {ready ? amount : failed ? t('balance.unavailable') : t('balance.loading')}
           </span>
         )}
+        {wide && today !== undefined && <span className={css.today}>{today}</span>}
         {wide && <IconRefreshOutline16 size={12} className={css.refresh} />}
       </button>
     </Tooltip>

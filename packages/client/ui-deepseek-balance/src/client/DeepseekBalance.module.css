@@ -1,4 +1,4 @@
-/* Compact footer action above Settings: icon + amount (wide) or icon (rail). */
+/* Compact footer action above Settings: icon + amounts (wide) or icon (rail). */
 
 .action {
   box-sizing: border-box;
@@ -29,6 +29,14 @@
 
 .label {
   font-variant-numeric: tabular-nums;
+}
+
+.today {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .refresh {

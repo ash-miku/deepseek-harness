@@ -6,6 +6,7 @@ export const zh = {
   'balance.loading': '查询中…',
   'balance.unavailable': '余额不可用',
   'balance.refresh': '刷新余额',
+  'balance.today': '今日',
 } satisfies Record<string, string>
 
 /** The deepseek-balance namespace key union. */
@@ -24,4 +25,5 @@ export const en = {
   'balance.loading': 'Loading…',
   'balance.unavailable': 'Balance unavailable',
   'balance.refresh': 'Refresh balance',
+  'balance.today': 'Today',
 } satisfies Record<DeepseekBalanceKey, string>

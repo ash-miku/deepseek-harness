@@ -14,14 +14,16 @@ const COPY: Record<string, string> = {
   'balance.loading': 'Loading…',
   'balance.unavailable': 'Balance unavailable',
   'balance.refresh': 'Refresh balance',
+  'balance.today': 'Today',
 }
 
-function readyState(): BalanceState {
+function readyState(todayCost?: string): BalanceState {
   return {
     status: 'ready',
     balance: {
       isAvailable: true, currency: 'CNY', totalBalance: '110.00',
       grantedBalance: '10.00', toppedUpBalance: '100.00', cachedAt: 1234,
+      ...todayCost === undefined ? {} : { todayCost, todayCurrency: 'CNY' },
     },
   }
 }
@@ -44,6 +46,14 @@ describe('DeepseekBalance', () => {
     mount(readyState(), true)
     expect(screen.getByText('¥110.00')).toBeDefined()
     expect(screen.getByRole('button', { name: 'Refresh balance' }).getAttribute('data-status')).toBe('ready')
+    expect(screen.queryByText(/Today/)).toBeNull()
+  })
+
+  it('renders today cost when the platform token is configured (wide)', () => {
+    mount(readyState('0.80'), true)
+    expect(screen.getByText('¥110.00')).toBeDefined()
+    expect(screen.getByText('Today ¥0.80')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Refresh balance' }).getAttribute('data-has-today')).toBe('true')
   })
 
   it('renders the unavailable label when errored (wide)', () => {
