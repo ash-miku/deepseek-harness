@@ -1,10 +1,11 @@
 /**
- * deepseek domain contract: account balance for the DeepSeek official API.
- * The host resolves the credential (the same `DEEPSEEK_API_KEY` the
- * llm-deepseek and web-search-deepseek adapters use) and queries
- * `GET https://api.deepseek.com/user/balance` on the client's behalf — the
- * key never crosses the wire. The value is cached host-side for a short TTL
- * so a settings-surface poll does not hammer the upstream endpoint.
+ * deepseek domain contract: account balance and today's official usage cost
+ * for the DeepSeek platform. Balance uses the same `DEEPSEEK_API_KEY` as the
+ * llm-deepseek and web-search-deepseek adapters; today's cost is queried
+ * through the platform usage endpoint with an optional `DEEPSEEK_PLATFORM_TOKEN`
+ * when configured. Neither credential ever crosses the wire. The reading is
+ * cached host-side for a short TTL so a settings-surface poll does not hammer
+ * the upstream endpoints.
  */
 
 import type { RpcRequest, RpcResponse } from './rpc.ts'
@@ -21,6 +22,10 @@ export interface DeepseekBalanceView {
   grantedBalance: string
   /** Topped-up (paid) portion of the balance. */
   toppedUpBalance: string
+  /** Today's usage cost (official platform figure), present only when the optional platform token is configured. */
+  todayCost?: string
+  /** Currency of todayCost when present (the cost endpoint carries its own currency). */
+  todayCurrency?: string
   /** Epoch milliseconds of the cached reading (the upstream's own time is not exposed). */
   cachedAt: number
 }
@@ -28,8 +33,9 @@ export interface DeepseekBalanceView {
 /** DeepSeek-domain unary methods (the map key deepseek.balance of RpcMethodMap). */
 export interface DeepseekApi {
   /**
-   * Read the account balance. `force` bypasses the host-side cache and
-   * re-queries upstream; otherwise a fresh cached reading is returned.
+   * Read the account balance plus today's cost when the optional platform
+   * token is configured. `force` bypasses the host-side cache and re-queries
+   * upstream; otherwise a fresh cached reading is returned.
    */
   balance(request: RpcRequest<{ force?: boolean }>): Promise<RpcResponse<{ balance: DeepseekBalanceView }>>
 }

@@ -1,8 +1,9 @@
 /**
  * deepseek.balance over createApiProxy: key resolution through the
- * credential seam, the upstream balance read, the five-minute host cache,
- * force bypass, and the failure projection. The key value never leaves the
- * host — the wire carries only the projected balance view.
+ * credential seam, the upstream balance read, optional today-cost via the
+ * platform token, the five-minute host cache, force bypass, and failure
+ * projection. Credentials never leave the host — the wire carries only the
+ * projected balance view.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -38,18 +39,20 @@ function expectErr<T>(response: RpcResponse<T>): { code: string; message: string
   return response.result.error
 }
 
-/** In-memory credential provider holding one reference. */
+/** In-memory credential provider holding named references. */
 class MemoryCredentials extends CredentialProvider {
-  constructor(ctx: ConstructorParameters<typeof CredentialProvider>[0], private readonly key?: string) {
+  constructor(ctx: ConstructorParameters<typeof CredentialProvider>[0], private readonly values: Record<string, string> = {}) {
     super(ctx)
   }
 
-  resolve(_ref: CredentialRef): Promise<ResolvedCredential | undefined> {
-    return Promise.resolve(this.key === undefined ? undefined : { value: this.key, source: 'file' })
+  resolve(ref: CredentialRef): Promise<ResolvedCredential | undefined> {
+    const value = this.values[ref]
+    return Promise.resolve(value === undefined ? undefined : { value, source: 'file' })
   }
 
-  describe(_ref: CredentialRef): Promise<CredentialInfo> {
-    return Promise.resolve({ configured: this.key !== undefined, ...this.key !== undefined ? { source: 'file' } : {}, writable: true })
+  describe(ref: CredentialRef): Promise<CredentialInfo> {
+    const configured = this.values[ref] !== undefined
+    return Promise.resolve({ configured, ...configured ? { source: 'file' } : {}, writable: true })
   }
 
   set(_ref: CredentialRef, _value: string): Promise<void> {
@@ -73,11 +76,42 @@ function upstreamBalance(): Record<string, unknown> {
   }
 }
 
+function localDate(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+function upstreamTodayCost(cost = '0.50'): Record<string, unknown> {
+  return {
+    code: 0,
+    data: {
+      biz_code: 0,
+      biz_data: [{
+        currency: 'CNY',
+        days: [{
+          date: localDate(),
+          data: [{
+            model: 'deepseek-v4-flash',
+            usage: [
+              { type: 'PROMPT_CACHE_HIT_TOKEN', amount: '0.10' },
+              { type: 'PROMPT_CACHE_MISS_TOKEN', amount: '0.20' },
+              { type: 'RESPONSE_TOKEN', amount: cost },
+              { type: 'REQUEST', amount: '2' },
+            ],
+          }],
+        }],
+      }],
+    },
+  }
+}
+
 function upstreamResponse(status: number, body: unknown): Response {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as Response
 }
 
-async function harness(credentials?: false | { key?: string }): Promise<{ api: ReturnType<typeof createApiProxy> }> {
+async function harness(credentials?: false | Record<string, string>): Promise<{ api: ReturnType<typeof createApiProxy> }> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt, { persona: '' })
@@ -86,7 +120,7 @@ async function harness(credentials?: false | { key?: string }): Promise<{ api: R
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(LlmRuntime)
   if (credentials !== false) {
-    await ctx.plugin(MemoryCredentials, credentials?.key !== undefined ? credentials.key : undefined)
+    await ctx.plugin(MemoryCredentials, credentials)
   }
   ctx.provide('workspaceRegistry', { list: () => [] } as never)
   const api = createApiProxy(ctx, DEFAULTS)
@@ -120,7 +154,7 @@ describe('deepseek.balance', () => {
       return upstreamResponse(200, upstreamBalance())
     })
     vi.stubGlobal('fetch', fetchMock)
-    const { api } = await harness({ key: 'sk-test' })
+    const { api } = await harness({ DEEPSEEK_API_KEY: 'sk-test' })
     const value = expectOk(await api.deepseek.balance(request({})))
     expect(value.balance).toMatchObject({
       isAvailable: true, currency: 'CNY', totalBalance: '110.00', grantedBalance: '10.00', toppedUpBalance: '100.00',
@@ -129,29 +163,77 @@ describe('deepseek.balance', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://api.deepseek.com/user/balance', expect.anything())
   })
 
-  it('serves a fresh reading from the host cache without re-fetching', async () => {
+  it('does not query the private cost endpoint without a platform token', async () => {
     const fetchMock = vi.fn(async () => upstreamResponse(200, upstreamBalance()))
     vi.stubGlobal('fetch', fetchMock)
-    const { api } = await harness({ key: 'sk-test' })
-    const first = expectOk(await api.deepseek.balance(request({})))
-    const second = expectOk(await api.deepseek.balance(request({})))
-    expect(second.balance.cachedAt).toBe(first.balance.cachedAt)
+    const { api } = await harness({ DEEPSEEK_API_KEY: 'sk-test' })
+    const value = expectOk(await api.deepseek.balance(request({})))
+    expect(value.balance.todayCost).toBeUndefined()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('force bypasses the host cache and re-queries upstream', async () => {
-    const fetchMock = vi.fn(async () => upstreamResponse(200, upstreamBalance()))
+  it('queries the platform cost endpoint and includes today cost when configured', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string> | undefined
+      if (String(url).includes('/user/balance')) {
+        expect(headers?.Authorization).toContain('Bearer sk-test')
+        return upstreamResponse(200, upstreamBalance())
+      }
+      expect(String(url)).toContain('/api/v0/usage/cost')
+      expect(headers?.Authorization).toContain('Bearer pt-test')
+      expect(headers?.Origin).toBe('https://platform.deepseek.com')
+      return upstreamResponse(200, upstreamTodayCost())
+    })
     vi.stubGlobal('fetch', fetchMock)
-    const { api } = await harness({ key: 'sk-test' })
+    const { api } = await harness({ DEEPSEEK_API_KEY: 'sk-test', DEEPSEEK_PLATFORM_TOKEN: 'pt-test' })
+    const value = expectOk(await api.deepseek.balance(request({})))
+    expect(value.balance.todayCost).toBe('0.80')
+    expect(value.balance.todayCurrency).toBe('CNY')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the balance when the private cost endpoint fails', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes('/user/balance')) return upstreamResponse(200, upstreamBalance())
+      return upstreamResponse(500, {})
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { api } = await harness({ DEEPSEEK_API_KEY: 'sk-test', DEEPSEEK_PLATFORM_TOKEN: 'pt-test' })
+    const value = expectOk(await api.deepseek.balance(request({})))
+    expect(value.balance.totalBalance).toBe('110.00')
+    expect(value.balance.todayCost).toBeUndefined()
+  })
+
+  it('serves a fresh reading from the host cache without re-fetching', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes('/user/balance')) return upstreamResponse(200, upstreamBalance())
+      return upstreamResponse(200, upstreamTodayCost())
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { api } = await harness({ DEEPSEEK_API_KEY: 'sk-test', DEEPSEEK_PLATFORM_TOKEN: 'pt-test' })
+    const first = expectOk(await api.deepseek.balance(request({})))
+    const second = expectOk(await api.deepseek.balance(request({})))
+    expect(second.balance.cachedAt).toBe(first.balance.cachedAt)
+    expect(second.balance.todayCost).toBe(first.balance.todayCost)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('force bypasses the host cache and re-queries upstream', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes('/user/balance')) return upstreamResponse(200, upstreamBalance())
+      return upstreamResponse(200, upstreamTodayCost())
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { api } = await harness({ DEEPSEEK_API_KEY: 'sk-test', DEEPSEEK_PLATFORM_TOKEN: 'pt-test' })
     await api.deepseek.balance(request({}))
     expectOk(await api.deepseek.balance(request({ force: true })))
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
   })
 
   it('projects an upstream HTTP failure as deepseek-balance-unavailable', async () => {
     const fetchMock = vi.fn(async () => upstreamResponse(401, { error: { message: 'invalid key' } }))
     vi.stubGlobal('fetch', fetchMock)
-    const { api } = await harness({ key: 'sk-test' })
+    const { api } = await harness({ DEEPSEEK_API_KEY: 'sk-test' })
     const error = expectErr(await api.deepseek.balance(request({})))
     expect(error.code).toBe('deepseek-balance-unavailable')
     expect(error.message).toContain('401')
@@ -160,7 +242,7 @@ describe('deepseek.balance', () => {
   it('projects a body without balance_infos as deepseek-balance-unavailable', async () => {
     const fetchMock = vi.fn(async () => upstreamResponse(200, { is_available: true }))
     vi.stubGlobal('fetch', fetchMock)
-    const { api } = await harness({ key: 'sk-test' })
+    const { api } = await harness({ DEEPSEEK_API_KEY: 'sk-test' })
     const error = expectErr(await api.deepseek.balance(request({})))
     expect(error.code).toBe('deepseek-balance-unavailable')
   })

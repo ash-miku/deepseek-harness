@@ -20,6 +20,8 @@ export const deepseekBalanceViewSchema = z.object({
   totalBalance: z.string(),
   grantedBalance: z.string(),
   toppedUpBalance: z.string(),
+  todayCost: z.string().optional(),
+  todayCurrency: z.string().optional(),
   cachedAt: z.number(),
 }) satisfies z.ZodType<Wire<DeepseekBalanceView>>
 

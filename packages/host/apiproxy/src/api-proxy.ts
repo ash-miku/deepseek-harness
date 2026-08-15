@@ -1109,8 +1109,98 @@ function changedWorkspaceView(workspaceId: string, value: unknown): WorkspaceVie
 const DEEPSEEK_BALANCE_URL = 'https://api.deepseek.com/user/balance'
 /** Credential reference backing the balance read — the same key the llm/search adapters use. */
 const DEEPSEEK_BALANCE_KEY_REF = 'DEEPSEEK_API_KEY'
+/** Optional platform session token enabling the private usage/cost endpoint. */
+const DEEPSEEK_PLATFORM_TOKEN_REF = 'DEEPSEEK_PLATFORM_TOKEN'
+/** Private platform usage endpoint; requires browser-like headers to pass the WAF. */
+const DEEPSEEK_COST_URL = 'https://platform.deepseek.com/api/v0/usage/cost'
+const DEEPSEEK_COST_HEADERS = {
+  Accept: 'application/json',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+  Origin: 'https://platform.deepseek.com',
+  Referer: 'https://platform.deepseek.com/usage',
+  'Sec-Fetch-Dest': 'empty',
+  'Sec-Fetch-Mode': 'cors',
+  'Sec-Fetch-Site': 'same-origin',
+} as const
 /** Host-side cache TTL for a balance reading (a settings-surface poll must not hammer upstream). */
 const DEEPSEEK_BALANCE_TTL_MS = 5 * 60_000
+
+/** One usage item of the private DeepSeek platform cost payload. */
+interface DeepseekUsageCostItem {
+  type?: string
+  amount?: string
+}
+
+/** One model's cost rows for a date. */
+interface DeepseekUsageCostModel {
+  model?: string
+  usage?: DeepseekUsageCostItem[]
+}
+
+/** One calendar day of the private DeepSeek platform cost payload. */
+interface DeepseekUsageCostDay {
+  date?: string
+  data?: DeepseekUsageCostModel[]
+}
+
+/** Currency-bearing top level of the private DeepSeek platform cost payload. */
+interface DeepseekUsageCostBizData {
+  currency?: string
+  days?: DeepseekUsageCostDay[]
+}
+
+/** Narrow wire shape of the private DeepSeek platform cost payload. */
+interface DeepseekUsageCostResponse {
+  code?: number
+  data?: {
+    biz_code?: number
+    biz_data?: DeepseekUsageCostBizData[]
+  }
+}
+
+/** Local calendar date in the platform payload's `YYYY-MM-DD` shape. */
+function deepseekDateString(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+/**
+ * Query the private platform cost endpoint for the current month and sum the
+ * current day's cost rows. Browser-like headers are required by the platform
+ * WAF even though the credential is a platform session token.
+ */
+async function fetchDeepseekTodayCost(platformToken: string): Promise<{ cost: string; currency: string }> {
+  const now = new Date()
+  const params = new URLSearchParams({
+    month: String(now.getMonth() + 1),
+    year: String(now.getFullYear()),
+  })
+  const response = await fetch(`${DEEPSEEK_COST_URL}?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${platformToken}`, ...DEEPSEEK_COST_HEADERS },
+  })
+  if (!response.ok) {
+    throw new Error(`DeepSeek usage request failed: HTTP ${response.status}`)
+  }
+  const body = await response.json() as DeepseekUsageCostResponse
+  if (body.code !== undefined && body.code !== 0) {
+    throw new Error(`DeepSeek usage request failed: code ${body.code}`)
+  }
+  const data = body.data
+  if (data?.biz_code !== undefined && data.biz_code !== 0) {
+    throw new Error(`DeepSeek usage request failed: biz_code ${data.biz_code}`)
+  }
+  const bizData = data?.biz_data?.[0]
+  const today = bizData?.days?.find(day => day.date === deepseekDateString(now))
+  let cost = 0
+  for (const model of today?.data ?? []) {
+    for (const item of model.usage ?? []) {
+      if (item.type === 'REQUEST') continue
+      cost += Number.parseFloat(item.amount ?? '0') || 0
+    }
+  }
+  return { cost: cost.toFixed(2), currency: bizData?.currency ?? 'CNY' }
+}
 
 export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiProxy {
   const sessionExportCompressionLevel = defaults.sessionExportCompressionLevel
@@ -3496,6 +3586,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             grantedBalance: info.granted_balance ?? '0',
             toppedUpBalance: info.topped_up_balance ?? '0',
             cachedAt: Date.now(),
+          }
+          // Today's usage cost is an optional enhancement. A missing or stale
+          // platform session must not hide the API-key balance.
+          const platformToken = (await credentials.resolve(credentialRef(DEEPSEEK_PLATFORM_TOKEN_REF)))?.value
+          if (platformToken !== undefined && platformToken.length > 0) {
+            try {
+              const today = await fetchDeepseekTodayCost(platformToken)
+              view.todayCost = today.cost
+              view.todayCurrency = today.currency
+            } catch (error: unknown) {
+              // Keep the balance; the surface shows only the available fields.
+              console.warn('deepseek today-cost read failed:', error instanceof Error ? error.message : String(error))
+            }
           }
           deepseekBalanceCache.set(DEEPSEEK_BALANCE_KEY_REF, { view, at: Date.now() })
           return ok(request, { balance: view })
