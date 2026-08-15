@@ -24,7 +24,7 @@
   font-family: var(--ds-font-family-code);
   font-size: 13px;
   line-height: 22px;
-  color: var(--dsw-alias-label-tertiary);
+  color: var(--dsw-alias-label-caption);
   white-space: pre-wrap;
   word-break: break-word;
 }

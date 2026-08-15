@@ -1,6 +1,6 @@
 .root {
-  --dsh-reasoning-title: color-mix(in srgb, var(--dsw-alias-label-primary) 70%, var(--dsw-alias-bg-base));
-  --dsh-reasoning-copy: color-mix(in srgb, var(--dsw-alias-label-primary) 55%, var(--dsw-alias-bg-base));
+  --dsh-reasoning-title: color-mix(in srgb, var(--dsw-alias-label-primary) 60%, var(--dsw-alias-bg-base));
+  --dsh-reasoning-copy: color-mix(in srgb, var(--dsw-alias-label-primary) 45%, var(--dsw-alias-bg-base));
   display: flex;
   flex-direction: column;
   color: var(--dsh-reasoning-copy);

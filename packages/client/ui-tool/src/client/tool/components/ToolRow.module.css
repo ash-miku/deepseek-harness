@@ -2,8 +2,8 @@
    [16 leading] gap6 [title 14/24] gap8 [2x2 dot] gap8 [summary FILL truncate]. */
 
 .root {
-  --dsh-tool-title: color-mix(in srgb, var(--dsw-alias-label-primary) 70%, var(--dsw-alias-bg-base));
-  --dsh-tool-copy: color-mix(in srgb, var(--dsw-alias-label-primary) 55%, var(--dsw-alias-bg-base));
+  --dsh-tool-title: color-mix(in srgb, var(--dsw-alias-label-primary) 60%, var(--dsw-alias-bg-base));
+  --dsh-tool-copy: color-mix(in srgb, var(--dsw-alias-label-primary) 45%, var(--dsw-alias-bg-base));
   display: flex;
   flex-direction: column;
   color: var(--dsh-tool-copy);
