@@ -368,6 +368,8 @@ export interface ChatNodeOwnerProps {
     /** Number of Tool roots collapsed into the summary. */
     count: number
   } | undefined
+  /** Unified fold slice for Assistant nodes: process-only or answer-only. */
+  processSlice?: 'process' | 'answer' | undefined
   openFile: (path: string) => void
   inspectCall: (callId: CallId) => void
   forkAt: (seq: number) => void

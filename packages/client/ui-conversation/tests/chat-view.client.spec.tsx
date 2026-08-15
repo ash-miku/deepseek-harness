@@ -95,6 +95,16 @@ const user = (seq: number, text: string): UserMessageNode => ({
 const assistant = (seq: number, text: string, turn = 1): AssistantMessageNode => ({
   kind: 'assistant', seq, time: seq * 1_000, turn, step: 1, blocks: [{ kind: 'text', text }],
 })
+const thinkingAssistant = (seq: number, thinking: string, answer: string | null, turn = 1): AssistantMessageNode => ({
+  kind: 'assistant', seq, time: seq * 1_000, turn, step: 1,
+  blocks: [
+    { kind: 'reasoning', text: thinking },
+    ...(answer === null ? [] : [{ kind: 'text' as const, text: answer }]),
+  ],
+})
+const runningToolInTurn = (callId: string, turn: number): RunningToolCall => ({
+  callId, name: 'bash', argsRaw: `{"command":"cmd-${callId}"}`, turn, step: 1, time: 1_000, callView: null, subCalls: [],
+})
 const retry = (seq: number): ModelRetryNode => ({
   kind: 'model-retry', retryId: 'chat-view-retry' as ModelRetryNode['retryId'],
   seq, time: seq * 1_000, turn: 1, step: 0,
@@ -443,6 +453,37 @@ describe('ChatView', () => {
         'fixture:user:1', 'fixture:assistant:2',
         'fixture:tool:a', 'call:a', 'fixture:tool:b', 'call:b',
       ])
+  })
+
+  it('fold mode unifies thinking and tool calls in one disclosure before the answer', () => {
+    const h = makeHarness({
+      nodes: [
+        user(1, 'do the thing'),
+        thinkingAssistant(2, 'Inspect the session', 'Running tools.'),
+        thinkingAssistant(3, 'Check persistence', 'Here is the answer.'),
+      ],
+      runningCalls: [runningToolInTurn('w1', 1)],
+    })
+    h.props.displayMode = createSnapshotStore<'full' | 'fold' | 'conclusion'>('fold')
+    const view = render(<h.ChatView {...h.props} />)
+
+    const fold = view.container.querySelector('[data-fold-process="unified"]')
+    expect(fold).not.toBeNull()
+    expect(view.getByText('过程')).toBeTruthy()
+    expect(view.getByText('2 段思考 · 1 次调用')).toBeTruthy()
+    expect(view.getByText('Here is the answer.')).toBeTruthy()
+    expect(view.container.querySelector('[data-chat-call-id="w1"]')).toBeNull()
+
+    fireEvent.click(view.getByText('过程'))
+    expect(view.container.querySelector('[data-chat-call-id="w1"]')).not.toBeNull()
+    expect(view.getByText('Inspect the session')).toBeTruthy()
+    expect(view.getByText('Check persistence')).toBeTruthy()
+
+    const collapse = view.getByRole('button', { name: '点击收起' })
+    expect(collapse).toBeTruthy()
+    fireEvent.click(collapse)
+    expect(view.container.querySelector('[data-chat-call-id="w1"]')).toBeNull()
+    expect(view.queryByText('点击收起')).toBeNull()
   })
 
   it('renders Host-pending steering at the flow tail and hands off to the durable node', () => {

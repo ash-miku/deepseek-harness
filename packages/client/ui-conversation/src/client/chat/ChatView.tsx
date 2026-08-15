@@ -12,19 +12,68 @@
 // ChatNodeSeat subscribes to one Node key, so Assistant deltas and Tool
 // lifecycle updates replace only their own row without remounting it.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import type { AssistantBlock, ConversationTimelineSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
+import type { ChatNode } from '../contract/chat-nodes.ts'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { formatRunDuration } from './message-chrome.ts'
+import { ProcessGroupRow } from './ProcessGroupRow.tsx'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
 
 const ABSENT_DISPLAY_SUBSCRIBE = (): (() => void) => () => {}
 const ABSENT_DISPLAY_READ = () => 'full' as const
+
+interface UnifiedFoldGroup {
+  readonly key: string
+  readonly turn: number
+  readonly processKeys: readonly string[]
+  readonly answerKeys: readonly string[]
+  readonly reasoningCount: number
+  readonly toolCount: number
+}
+
+interface UnifiedFoldPlan {
+  readonly processByKey: ReadonlyMap<string, UnifiedFoldGroup>
+  readonly answerByKey: ReadonlyMap<string, UnifiedFoldGroup>
+}
+
+function nodeTurn(node: ChatNode | undefined): number | undefined {
+  if (node === undefined) return undefined
+  const location = node.location
+  if (location.kind === 'turn' || location.kind === 'step') return location.turn.turn
+  if (node.kind === 'assistant-step') return node.data.turn
+  if (node.kind === 'tool-call') {
+    const root = node.data.root
+    return 'turn' in root ? root.turn : undefined
+  }
+  return undefined
+}
+
+function reasoningBlockCount(blocks: readonly AssistantBlock[]): number {
+  return blocks.reduce((count, block) => (
+    count + (block.kind === 'reasoning' && block.text.trim() !== '' ? 1 : 0)
+  ), 0)
+}
+
+function hasAnswerBlocks(blocks: readonly AssistantBlock[]): boolean {
+  return blocks.some(block => (
+    (block.kind === 'text' && block.text.trim() !== '')
+    || block.kind === 'image'
+    || block.kind === 'other'
+  ))
+}
+
+function processSummary(group: UnifiedFoldGroup, t: ChatViewSlotProps['t']): string {
+  const parts: string[] = []
+  if (group.reasoningCount > 0) parts.push(t('process.thinkingCount', { count: group.reasoningCount }))
+  if (group.toolCount > 0) parts.push(t('process.toolCount', { count: group.toolCount }))
+  return parts.join(' · ')
+}
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -167,15 +216,13 @@ export function ChatView({
     displayModeSource === undefined ? ABSENT_DISPLAY_READ : () => displayModeSource.getSnapshot(),
     ABSENT_DISPLAY_READ,
   )
-  const foldGroups = useMemo(() => {
+  const toolFoldGroups = useMemo(() => {
     const groups = new Map<string, { first: boolean; count: number }>()
     if (displayMode !== 'fold') return groups
     for (const key of order) {
-      const node = nodeStore.get(key)
+      const node = nodeStore.get(key) as ChatNode | undefined
       if (node?.kind !== 'tool-call') continue
-      const turn = node.location.kind === 'turn' || node.location.kind === 'step'
-        ? node.location.turn.turn
-        : 0
+      const turn = nodeTurn(node) ?? 0
       const groupKey = `tool:${turn}`
       const current = groups.get(groupKey)
       if (current === undefined) {
@@ -185,6 +232,75 @@ export function ChatView({
       }
     }
     return groups
+  }, [displayMode, order, nodeStore])
+  const unifiedFold = useMemo<UnifiedFoldPlan>(() => {
+    const empty: UnifiedFoldPlan = { processByKey: new Map(), answerByKey: new Map() }
+    if (displayMode !== 'fold') return empty
+
+    const processTurns = new Set<number>()
+    for (const key of order) {
+      const node = nodeStore.get(key) as ChatNode | undefined
+      const turn = nodeTurn(node)
+      if (turn === undefined) continue
+      if (
+        node?.kind === 'tool-call'
+        || (node?.kind === 'assistant-step' && reasoningBlockCount(node.data.blocks) > 0)
+      ) {
+        processTurns.add(turn)
+      }
+    }
+    if (processTurns.size === 0) return empty
+
+    const processKeys = new Map<number, string[]>()
+    const answerKeys = new Map<number, string[]>()
+    const counts = new Map<number, { reasoning: number; tools: number }>()
+    for (const key of order) {
+      const node = nodeStore.get(key) as ChatNode | undefined
+      const turn = nodeTurn(node)
+      if (turn === undefined || !processTurns.has(turn)) continue
+      if (node?.kind === 'tool-call') {
+        const list = processKeys.get(turn) ?? []
+        list.push(key)
+        processKeys.set(turn, list)
+        const count = counts.get(turn) ?? { reasoning: 0, tools: 0 }
+        count.tools += 1
+        counts.set(turn, count)
+      } else if (node?.kind === 'assistant-step') {
+        const reasoning = reasoningBlockCount(node.data.blocks)
+        if (reasoning > 0) {
+          const list = processKeys.get(turn) ?? []
+          list.push(key)
+          processKeys.set(turn, list)
+          const count = counts.get(turn) ?? { reasoning: 0, tools: 0 }
+          count.reasoning += reasoning
+          counts.set(turn, count)
+        }
+        if (hasAnswerBlocks(node.data.blocks)) {
+          const list = answerKeys.get(turn) ?? []
+          list.push(key)
+          answerKeys.set(turn, list)
+        }
+      }
+    }
+
+    const processByKey = new Map<string, UnifiedFoldGroup>()
+    const answerByKey = new Map<string, UnifiedFoldGroup>()
+    for (const turn of [...processTurns].sort((left, right) => left - right)) {
+      const process = processKeys.get(turn) ?? []
+      const answer = answerKeys.get(turn) ?? []
+      const count = counts.get(turn) ?? { reasoning: 0, tools: 0 }
+      const group: UnifiedFoldGroup = {
+        key: `process:${turn}`,
+        turn,
+        processKeys: process,
+        answerKeys: answer,
+        reasoningCount: count.reasoning,
+        toolCount: count.tools,
+      }
+      for (const key of process) processByKey.set(key, group)
+      for (const key of answer) answerByKey.set(key, group)
+    }
+    return { processByKey, answerByKey }
   }, [displayMode, order, nodeStore])
 
   const pendingSteering = useMemo(
@@ -389,6 +505,60 @@ export function ChatView({
     loadOlder()
   }
 
+  const renderChatNodeSeat = (
+    nodeKey: string,
+    key: string,
+    processSlice: 'process' | 'answer' | undefined,
+  ): ReactNode => (
+    <ChatNodeSeat
+      key={key}
+      nodeKey={nodeKey}
+      useSession={useSession}
+      selectedCallId={selectedCallId}
+      cwd={cwd}
+      displayMode={processSlice === undefined ? displayMode : 'full'}
+      foldGroup={processSlice === undefined ? toolFoldGroups.get(nodeKey) : undefined}
+      processSlice={processSlice}
+      openFile={openFile}
+      inspectCall={inspectCall}
+      forkAt={forkAt}
+      loadImage={loadImage}
+      fileMentions={fileMentions}
+      renderSlot={renderSlot}
+      t={t}
+    />
+  )
+
+  const flow: ReactNode[] = []
+  const handled = new Set<string>()
+  for (const nodeKey of order) {
+    if (handled.has(nodeKey)) continue
+    const group = unifiedFold.processByKey.get(nodeKey)
+    if (group !== undefined) {
+      for (const key of group.processKeys) handled.add(key)
+      for (const key of group.answerKeys) handled.add(key)
+      flow.push(
+        <div
+          key={group.key}
+          className={css.flowItem}
+          data-chat-anchor-key={group.key}
+          data-chat-flow-key={group.key}
+          data-chat-flow-kind="process-group"
+        >
+          <ProcessGroupRow title={t('process.title')} summary={processSummary(group, t)} collapseLabel={t('process.collapse')}>
+            {group.processKeys.map(key => renderChatNodeSeat(key, `${key}:process`, 'process'))}
+          </ProcessGroupRow>
+        </div>,
+      )
+      for (const key of group.answerKeys) {
+        flow.push(renderChatNodeSeat(key, `${key}:answer`, 'answer'))
+      }
+      continue
+    }
+    if (unifiedFold.answerByKey.has(nodeKey)) continue
+    flow.push(renderChatNodeSeat(nodeKey, nodeKey, undefined))
+  }
+
   return (
     <div className={css.root}>
       <div ref={listRef} className={css.scroll}>
@@ -406,24 +576,7 @@ export function ChatView({
               </button>
             </div>
           )}
-          {order.map(nodeKey => (
-            <ChatNodeSeat
-              key={nodeKey}
-              nodeKey={nodeKey}
-              useSession={useSession}
-              selectedCallId={selectedCallId}
-              cwd={cwd}
-              displayMode={displayMode}
-              foldGroup={foldGroups.get(nodeKey)}
-              openFile={openFile}
-              inspectCall={inspectCall}
-              forkAt={forkAt}
-              loadImage={loadImage}
-              fileMentions={fileMentions}
-              renderSlot={renderSlot}
-              t={t}
-            />
-          ))}
+          {flow}
           {/* No pending placeholders: questions (ui-user-questions) and approvals
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}

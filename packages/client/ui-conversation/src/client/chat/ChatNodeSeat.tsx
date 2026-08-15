@@ -12,6 +12,7 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly t: ChatViewSlotProps['t']
   readonly displayMode?: ConversationProcessDisplayMode | undefined
   readonly foldGroup?: ChatNodeOwnerProps['foldGroup'] | undefined
+  readonly processSlice?: ChatNodeOwnerProps['processSlice'] | undefined
 }
 
 type RoutedChatNodeOwner = {
@@ -20,7 +21,7 @@ type RoutedChatNodeOwner = {
 
 /** Subscribe and dispatch one stable Context key without observing sibling Nodes. */
 export const ChatNodeSeat = memo(function ChatNodeSeat({
-  nodeKey, selectedCallId, cwd, displayMode, foldGroup, openFile, inspectCall, forkAt,
+  nodeKey, selectedCallId, cwd, displayMode, foldGroup, processSlice, openFile, inspectCall, forkAt,
   loadImage, fileMentions, useSession, renderSlot, t,
 }: ChatNodeSeatProps) {
   const node = useSession(snapshot => snapshot.chat.nodes.get(nodeKey))
@@ -32,12 +33,13 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       cwd,
       ...(displayMode === undefined ? {} : { displayMode }),
       ...(foldGroup === undefined ? {} : { foldGroup }),
+      ...(processSlice === undefined ? {} : { processSlice }),
       openFile,
       inspectCall,
       forkAt,
       loadImage,
       fileMentions,
-    }, [node, selectedCallId, cwd, displayMode, foldGroup, openFile, inspectCall, forkAt, loadImage, fileMentions])
+    }, [node, selectedCallId, cwd, displayMode, foldGroup, processSlice, openFile, inspectCall, forkAt, loadImage, fileMentions])
   if (routedNode === undefined || owner === null) return null
   // Runtime dispatch owns the correlation: every Node's discriminant is the
   // keyed-slot entry passed alongside that same Node. TypeScript does not
