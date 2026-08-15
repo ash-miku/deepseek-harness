@@ -241,6 +241,9 @@
      gutter moves the input card sideways by the bar's width whenever the two
      differ ([decision](../../../../../../.agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.md)). */
   scrollbar-gutter: stable;
+  /* Toggling a composer control can change its width/outline; do not let the
+     browser move the sticky footer to preserve a bottom anchor on click. */
+  overflow-anchor: none;
 }
 
 .root[data-phase='active'] .viewArea {
@@ -283,6 +286,7 @@
      on the same element, so the seat below compensates with the bar's width
      ([decision](../../../../../../.agents/notes/implemented/bug-fix/2026-08-04-composer-tab-gutter-reservation.md)). */
   scrollbar-gutter: auto;
+  overflow-anchor: none;
 }
 
 .scrollBody:has([data-conversation-composer-overlay]) > :global([data-slot='conversation.session']) > .viewArea {
