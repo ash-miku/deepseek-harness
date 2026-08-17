@@ -2,8 +2,8 @@
  * The workspace/session browsing region filling the sidebar shell's
  * `sidebar.workspaces` hole: section header (title + view options + add
  * workspace), search, the grouped tree or flat list, and the workspace
- * dialogs. Wide state renders the full browser; rail state renders the two
- * region icons (search / add workspace) as 36px controls on the shell's shared
+ * dialogs. Wide state renders the full browser; rail state renders the three
+ * region icons (search / archive / add workspace) as 36px controls on the shell's shared
  * rail entry path, each requesting expansion through the owner share. Adding
  * is the header button's one action, so it raises the directory flow with no
  * menu in between; the flow and its error dialog live in WorkspacePicker
@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  Button, IconCloseFill14, IconPersonalizationOutline16,
+  Button, IconArchiveOutline20, IconCloseFill14, IconPersonalizationOutline16,
   IconProjectAddOutline16, IconSearchOutline16, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
@@ -23,6 +23,7 @@ import type { SessionNode, SessionOrderBy } from './tree.ts'
 import { ARCHIVED_KEY, deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from './tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './rows/Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY } from './stores.ts'
+import { ArchiveInactiveDialog } from './ArchiveInactiveDialog.tsx'
 import { WorkspacePickFlow } from './WorkspacePicker.tsx'
 import css from './WorkspaceBrowser.module.css'
 
@@ -807,6 +808,7 @@ export function WorkspaceBrowser({
   const [wsPickerOpen, setWsPickerOpen] = useState(false)
   const wsPlusRef = useRef<HTMLButtonElement>(null)
   const composingRef = useRef(false)
+  const [archiveInactiveOpen, setArchiveInactiveOpen] = useState(false)
 
   // Rail search = expand + land in the search box: the flag arms before the
   // expand request; once the shell flips wide the input mounts and takes focus.
@@ -1067,6 +1069,20 @@ export function WorkspaceBrowser({
           {/* Adding is the button's one action, so a composition with no
               picking affordance has nothing to offer here: the region hides the
               button rather than leaving a dead one in the header. */}
+          <Tooltip label={t('archiveInactive.action')} side="bottom" delayMs={500}>
+            <button
+              type="button"
+              className={css.iconButton}
+              aria-label={t('archiveInactive.action')}
+              onClick={() => {
+                setWsPickerOpen(false)
+                setSearchExpanded(false)
+                setArchiveInactiveOpen(true)
+              }}
+            >
+              <IconArchiveOutline20 size={wide ? 16 : 18} />
+            </button>
+          </Tooltip>
           {directoryFlowAvailable && (
             <Tooltip label={t('workspace.add')} side="bottom" delayMs={500}>
               <button
@@ -1276,6 +1292,14 @@ export function WorkspaceBrowser({
         {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
         {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
       </Modal>
+      <ArchiveInactiveDialog
+        open={archiveInactiveOpen}
+        onClose={() => { setArchiveInactiveOpen(false) }}
+        useSessions={useSessions}
+        archivedSessionIds={archivedSessionIds}
+        archiveSession={archiveSession}
+        t={t}
+      />
     </div>
   )
 }

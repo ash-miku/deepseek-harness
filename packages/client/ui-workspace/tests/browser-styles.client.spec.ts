@@ -113,4 +113,11 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')
     expect(declarations('.rail .search')?.get('width')).toBe('36px')
   })
+
+  it('renders the archive threshold as a themed custom selector', () => {
+    expect(declarations('.archiveSelector')?.get('background')).toBe('var(--dsw-alias-bg-module-platform)')
+    expect(declarations('.archiveSelector')?.get('color')).toBe('var(--dsw-alias-label-primary)')
+    expect(declarations('.archiveSelector:hover')?.get('background')).toBe('var(--dsw-alias-interactive-bg-hover)')
+    expect(declarations('.archiveChevron')?.get('color')).toBe('var(--dsw-alias-label-secondary)')
+  })
 })

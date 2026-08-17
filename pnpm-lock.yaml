@@ -1294,9 +1294,6 @@ importers:
       '@deepseek-ai/dsh-client-ui-cordis':
         specifier: workspace:^
         version: link:../../extensions/ui-cordis
-      '@deepseek-ai/dsh-client-ui-deepseek-balance':
-        specifier: workspace:^
-        version: link:../../client/ui-deepseek-balance
       '@deepseek-ai/dsh-client-ui-deliverables':
         specifier: workspace:^
         version: link:../../client/ui-deliverables

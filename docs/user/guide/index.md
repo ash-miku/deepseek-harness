@@ -22,6 +22,10 @@ Start a session and send:
 
 The agent can read and edit workspace files, run commands, delegate work, and maintain a plan. The Web UI asks before operations that require approval under the active permission policy.
 
+## Manage sessions
+
+The sidebar session list supports rename, fork, and archive. Use the archive icon next to the view and add actions to archive idle sessions that have not updated for more than 7, 30, 90, or 180 days. The dialog excludes current, running, pending, blank, subagent, and already-archived sessions; archived sessions remain available under the archived group.
+
 ## Continue
 
 - [Configure models](./providers.md)

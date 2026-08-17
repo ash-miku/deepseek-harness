@@ -20,6 +20,7 @@ beforeEach(() => { localStorage.clear(); createWorkspaceViewStore().create().act
 // lookup chain (namespace, then common vocabulary, then the key).
 const t: WorkspaceBrowserProps['t'] = makeTranslate(zh, commonZh)
 
+const DAY_MS = 86_400_000
 const sid = (id: string) => id as SessionId
 const wid = (id: string) => id as WorkspaceId
 const summary = (id: string, updatedAt: number, overrides: Partial<SessionSummary> = {}): SessionSummary => ({
@@ -344,6 +345,87 @@ describe('WorkspaceBrowser', () => {
     fireEvent.click(archivedRow.querySelector('button[aria-label^="会话“gone-s”的操作"]') as HTMLElement)
     fireEvent.click(screen.getByRole('menuitem', { name: '取消归档' }))
     expect(unarchiveSession).toHaveBeenCalledWith(sid('gone-s'))
+  })
+
+  it('bulk archives only inactive idle sessions through the header dialog', async () => {
+    const now = Date.now()
+    const archiveSession = vi.fn(async () => {})
+    const older = summary('older', now - 40 * DAY_MS)
+    const tenDays = summary('tenDays', now - 10 * DAY_MS)
+    const current = summary('current', now - 40 * DAY_MS)
+    const running = summary('running', now - 40 * DAY_MS, { running: true })
+    const pending = summary('pending', now - 40 * DAY_MS, { pendingInteraction: 'approval' })
+    const blank = summary('blank', now - 40 * DAY_MS, { blank: true })
+    const subagent = summary('subagent', now - 40 * DAY_MS, { origin: 'subagent' })
+    const archived = summary('archived', now - 40 * DAY_MS)
+    mount({
+      useSessions: hook(sessionState([
+        older, tenDays, current, running, pending, blank, subagent, archived,
+      ], { current: sid('current') })),
+      useWorkspaces: hook(workspaceState([
+        workspace('alpha', ['older', 'tenDays', 'current', 'running', 'pending', 'blank', 'subagent', 'archived']),
+      ], [sid('archived')])),
+      archiveSession,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '归档未更新会话' }))
+    expect(screen.getByText(/将归档 1 个空闲会话/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '归档时间' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '7 天' }))
+    expect(screen.getByText(/将归档 2 个空闲会话/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '归档' }))
+    await waitFor(() => { expect(archiveSession).toHaveBeenCalledTimes(2) })
+    expect(archiveSession).toHaveBeenCalledWith(sid('older'))
+    expect(archiveSession).toHaveBeenCalledWith(sid('tenDays'))
+    expect(screen.getByText('已归档 2 个会话。')).toBeTruthy()
+  })
+
+  it('shows an empty state and disables confirm when no session matches', () => {
+    mount({
+      useSessions: hook(sessionState([summary('recent', Date.now())])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['recent'])])),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '归档未更新会话' }))
+    expect(screen.getByText('没有符合条件的会话。')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '归档' })).toHaveProperty('disabled', true)
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(screen.queryByText('没有符合条件的会话。')).toBeNull()
+  })
+
+  it('shows pending progress and keeps the dialog open for partial failures', async () => {
+    let resolve: (() => void) | undefined
+    const gate = new Promise<void>((done) => { resolve = done })
+    const archiveSession = vi.fn(() => gate)
+    const now = Date.now()
+    mount({
+      useSessions: hook(sessionState([summary('one', now - 40 * DAY_MS), summary('two', now - 40 * DAY_MS)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['one', 'two'])])),
+      archiveSession,
+    })
+    fireEvent.click(screen.getByRole('button', { name: '归档未更新会话' }))
+    fireEvent.click(screen.getByRole('button', { name: '归档' }))
+    expect(screen.getByText('正在归档 2 个会话…')).toBeTruthy()
+    await act(async () => { resolve?.() })
+    await waitFor(() => { expect(screen.getByText('已归档 2 个会话。')).toBeTruthy() })
+  })
+
+  it('reports per-session failures without closing the dialog', async () => {
+    const archiveSession = vi.fn(async (id: SessionId) => {
+      if (id === sid('bad')) throw new Error('archive exploded')
+    })
+    const now = Date.now()
+    mount({
+      useSessions: hook(sessionState([summary('good', now - 40 * DAY_MS), summary('bad', now - 40 * DAY_MS)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['good', 'bad'])])),
+      archiveSession,
+    })
+    fireEvent.click(screen.getByRole('button', { name: '归档未更新会话' }))
+    fireEvent.click(screen.getByRole('button', { name: '归档' }))
+    await waitFor(() => {
+      expect(screen.getByText('已归档 1 个会话，1 个失败。')).toBeTruthy()
+      expect(screen.getByText('1 个会话归档失败，日志已保留。')).toBeTruthy()
+    })
   })
 
   it('logs and keeps the tree when the archive call rejects', async () => {
