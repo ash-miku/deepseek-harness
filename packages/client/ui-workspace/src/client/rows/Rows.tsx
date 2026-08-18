@@ -9,7 +9,8 @@ import { useState } from 'react'
 import clsx from 'clsx'
 import {
   HoverCard, IconArchiveOutline20, IconBranchOutline16, IconEditOutline16,
-  IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16, IconPlusOutline16,
+  IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16, IconLikeFill16,
+  IconLikeOutline16, IconPlusOutline16,
   IconTrashOutline16, IconTriangleRightFill14, Menu, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -121,9 +122,11 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
   // Ungrouped and archived buckets have no workspace title: dictionary copy.
   const label = row.archived
     ? t('group.archived')
-    : row.workspaceId === undefined
-      ? t('group.ungrouped')
-      : row.label
+    : row.favorite
+      ? t('group.favorite')
+      : row.workspaceId === undefined
+        ? t('group.ungrouped')
+        : row.label
   const active = group.expanded && group.containsCurrent
   const [menuOpen, setMenuOpen] = useState(false)
   const workspaceMenuItems = [
@@ -184,7 +187,7 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
             )}
           />
         )}
-        {!row.archived && (
+        {!row.archived && !row.favorite && (
           <button
             type="button"
             className={css.iconButton}
@@ -357,7 +360,10 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, onUnarchive, drag, flat = false, t }: {
+export function SessionNodeItem({
+  node, currentId, now, onOpen, onRename, onFork, onArchive, onUnarchive,
+  onFavorite, onUnfavorite, drag, flat = false, t,
+}: {
   node: SessionNode
   currentId: string | undefined
   now: number
@@ -370,6 +376,10 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   onArchive: (id: SessionNode['id']) => void
   /** Restore this archived session (row menu action; commits without a dialog). */
   onUnarchive: (id: SessionNode['id']) => void
+  /** Favorite (pin) this session (row menu action; commits without a dialog). */
+  onFavorite: (id: SessionNode['id']) => void
+  /** Unfavorite (unpin) this session (row menu action; commits without a dialog). */
+  onUnfavorite: (id: SessionNode['id']) => void
   /** Present only on draggable rows (workspace-group sessions outside search). */
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
@@ -389,6 +399,9 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   const sessionMenuItems = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
     { id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> },
+    row.favorite
+      ? { id: 'unfavorite', label: t('menu.unfavoriteSession'), icon: <IconLikeFill16 size={16} /> }
+      : { id: 'favorite', label: t('menu.favoriteSession'), icon: <IconLikeOutline16 size={16} /> },
     // 20-native glyph in the menu's 16px icon slot (Menu.module.css .itemIcon).
     row.archived
       ? { id: 'unarchive', label: t('menu.unarchiveSession'), icon: <IconArchiveOutline20 size={16} /> }
@@ -456,6 +469,8 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
               if (id === 'fork') onFork(node.id)
               if (id === 'archive') onArchive(node.id)
               if (id === 'unarchive') onUnarchive(node.id)
+              if (id === 'favorite') onFavorite(node.id)
+              if (id === 'unfavorite') onUnfavorite(node.id)
             }}
             portal
             closeOnPointerLeave

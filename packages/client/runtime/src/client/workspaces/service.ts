@@ -22,6 +22,11 @@ export interface WorkspaceListState {
    * build their own transient Set.
    */
   archivedSessionIds: readonly SessionId[]
+  /**
+   * Registry-global favorite (pinned) set in favorite order (the order they
+   * were added). Browsing surfaces render these first.
+   */
+  favoriteSessionIds: readonly SessionId[]
   state: 'idle' | 'loading' | 'error'
   phase: WorkspaceListPhase
   error: RpcError | null
@@ -66,7 +71,7 @@ export class WorkspaceRuntime implements IWorkspaces {
   constructor(ctx: Context, private readonly api: IApiClient, private readonly sessions: SessionsPort) {
     this.manager = new WorkspaceManager(api)
     this.list = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'pending', error: null,
+      items: [], archivedSessionIds: [], favoriteSessionIds: [], state: 'idle', phase: 'pending', error: null,
       baselinesReady: false, recentWorkspaceId: undefined,
     })
     this.manager.subscribe(() => { this.project() })
@@ -303,6 +308,24 @@ export class WorkspaceRuntime implements IWorkspaces {
   }
 
   /**
+   * Favorite (pin) a session into the registry-global set.
+   * @param sessionId - session to favorite.
+   */
+  async favoriteSession(sessionId: SessionId): Promise<void> {
+    const result = await this.manager.favoriteSession(sessionId)
+    if (!result.ok) throw new Error(`session favorite failed: ${result.error.code}: ${result.error.message}`)
+  }
+
+  /**
+   * Unfavorite (unpin) a session from the registry-global set.
+   * @param sessionId - session to unfavorite.
+   */
+  async unfavoriteSession(sessionId: SessionId): Promise<void> {
+    const result = await this.manager.unfavoriteSession(sessionId)
+    if (!result.ok) throw new Error(`session unfavorite failed: ${result.error.code}: ${result.error.message}`)
+  }
+
+  /**
    * Move a session within its Workspace's manual order (DOM-insertBefore-like).
    * @param workspaceId - owning workspace.
    * @param sessionId - accounted session to move.
@@ -344,17 +367,10 @@ export class WorkspaceRuntime implements IWorkspaces {
     const workspace = this.manager.getSnapshot()
     const sessions = this.sessions.list.getSnapshot()
     const baselinesReady = workspace.phase === 'ready' && sessions.phase === 'ready'
-    // An archived current selection clears into the New Session view state —
-    // a hidden row must not stay open behind the list. Sweeping here covers
-    // every install path with one rule: the local unary echo, another tab's
-    // changed frame, and a reconnect baseline restoring a persisted
-    // selection that was archived while this client was away.
-    if (sessions.current !== undefined && workspace.archivedSessionIds.includes(sessions.current)) {
-      this.sessions.clear()
-    }
     this.list.set({
       items: workspace.items,
       archivedSessionIds: workspace.archivedSessionIds,
+      favoriteSessionIds: workspace.favoriteSessionIds,
       state: workspace.state,
       phase: workspace.phase,
       error: workspace.error,

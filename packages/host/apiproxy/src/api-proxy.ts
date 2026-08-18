@@ -2896,6 +2896,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         return Promise.resolve(ok(request, {
           items: ctx.workspaceRegistry.list().map(workspaceView),
           archivedSessionIds: [...ctx.workspaceRegistry.archivedSessionIds],
+          favoriteSessionIds: [...ctx.workspaceRegistry.favoriteSessionIds],
         }))
       },
 
@@ -3015,6 +3016,27 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         const { sessionId } = request.payload
         await ctx.workspaceRegistry.unarchiveSession(sessionId)
         return ok(request, { archivedSessionIds: [...ctx.workspaceRegistry.archivedSessionIds] })
+      },
+
+      async favoriteSession(request) {
+        const { sessionId } = request.payload
+        try {
+          await ctx.workspaceRegistry.favoriteSession(sessionId)
+        } catch (error: unknown) {
+          if (!(error instanceof WorkspaceUnknownSessionError)) throw error
+          return err(request, {
+            code: 'session-not-found',
+            message: error.message,
+            details: { sessionId },
+          })
+        }
+        return ok(request, { favoriteSessionIds: [...ctx.workspaceRegistry.favoriteSessionIds] })
+      },
+
+      async unfavoriteSession(request) {
+        const { sessionId } = request.payload
+        await ctx.workspaceRegistry.unfavoriteSession(sessionId)
+        return ok(request, { favoriteSessionIds: [...ctx.workspaceRegistry.favoriteSessionIds] })
       },
     },
 
@@ -3719,6 +3741,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         // stream opens against the current set; workspace.list re-baselines
         // reconnecting clients, so only later changes need frames.
         let archivedSessionIds = ctx.workspaceRegistry.archivedSessionIds
+        let favoriteSessionIds = ctx.workspaceRegistry.favoriteSessionIds
         const disposers = [
           ctx.on('session/created', (session: Session) => {
             queue.push(frame({
@@ -3770,6 +3793,14 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
                 queue.push(frame({
                   type: 'host/archived-sessions-changed',
                   archivedSessionIds: [...state.archivedSessionIds],
+                }))
+              }
+              if (state.favoriteSessionIds.length !== favoriteSessionIds.length
+                || state.favoriteSessionIds.some((id, index) => id !== favoriteSessionIds[index])) {
+                favoriteSessionIds = state.favoriteSessionIds
+                queue.push(frame({
+                  type: 'host/favorite-sessions-changed',
+                  favoriteSessionIds: [...state.favoriteSessionIds],
                 }))
               }
               return

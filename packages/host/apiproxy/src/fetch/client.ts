@@ -34,7 +34,9 @@ import {
 import {
   workspaceArchiveSessionValueSchema,
   workspaceCreateValueSchema,
+  workspaceFavoriteSessionValueSchema,
   workspaceUnarchiveSessionValueSchema,
+  workspaceUnfavoriteSessionValueSchema,
   workspaceDeleteValueSchema,
   workspaceInsertBeforeValueSchema,
   workspaceInsertSessionBeforeValueSchema,
@@ -123,6 +125,8 @@ export interface IApiClient {
     insertSessionBefore(payload: RequestPayload<'workspace.insertSessionBefore'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.insertSessionBefore'>>>
     archiveSession(payload: RequestPayload<'workspace.archiveSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.archiveSession'>>>
     unarchiveSession(payload: RequestPayload<'workspace.unarchiveSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.unarchiveSession'>>>
+    favoriteSession(payload: RequestPayload<'workspace.favoriteSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.favoriteSession'>>>
+    unfavoriteSession(payload: RequestPayload<'workspace.unfavoriteSession'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.unfavoriteSession'>>>
   }
   skills: {
     list(payload: RequestPayload<'skill.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'skill.list'>>>
@@ -205,6 +209,8 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'workspace.insertSessionBefore': workspaceInsertSessionBeforeValueSchema,
   'workspace.archiveSession': workspaceArchiveSessionValueSchema,
   'workspace.unarchiveSession': workspaceUnarchiveSessionValueSchema,
+  'workspace.favoriteSession': workspaceFavoriteSessionValueSchema,
+  'workspace.unfavoriteSession': workspaceUnfavoriteSessionValueSchema,
   'skill.list': skillListValueSchema,
   'agentPreset.list': agentPresetListValueSchema,
   'agentPreset.select': agentPresetSelectValueSchema,
@@ -468,6 +474,8 @@ export abstract class AbstractApiClient implements IApiClient {
     insertSessionBefore: (payload, signal) => this.callUnary('workspace.insertSessionBefore', payload, signal),
     archiveSession: (payload, signal) => this.callUnary('workspace.archiveSession', payload, signal),
     unarchiveSession: (payload, signal) => this.callUnary('workspace.unarchiveSession', payload, signal),
+    favoriteSession: (payload, signal) => this.callUnary('workspace.favoriteSession', payload, signal),
+    unfavoriteSession: (payload, signal) => this.callUnary('workspace.unfavoriteSession', payload, signal),
   }
 
   readonly skills: IApiClient['skills'] = {

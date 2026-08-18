@@ -39,8 +39,12 @@ const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView 
   workspaceId: wid(id), path: `/projects/${id}`, title,
   sessionIds: sessionIds.map(sid), createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
 })
-const workspaceState = (items: readonly WorkspaceView[], archivedSessionIds: readonly SessionId[] = []): WorkspaceListState => ({
-  items, archivedSessionIds, state: 'idle', phase: 'ready', error: null, baselinesReady: true,
+const workspaceState = (
+  items: readonly WorkspaceView[],
+  archivedSessionIds: readonly SessionId[] = [],
+  favoriteSessionIds: readonly SessionId[] = [],
+): WorkspaceListState => ({
+  items, archivedSessionIds, favoriteSessionIds, state: 'idle', phase: 'ready', error: null, baselinesReady: true,
   recentWorkspaceId: items[0]?.workspaceId,
 })
 function hook<T>(snapshot: T) {
@@ -78,6 +82,8 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     deleteWorkspace: vi.fn(async () => {}),
     archiveSession: vi.fn(async () => {}),
     unarchiveSession: vi.fn(async () => {}),
+    favoriteSession: vi.fn(async () => {}),
+    unfavoriteSession: vi.fn(async () => {}),
     insertWorkspaceBefore: vi.fn(async () => {}),
     insertSessionBefore: vi.fn(async () => {}),
     createWorkspace: vi.fn(async () => workspace('created', [])),
@@ -345,6 +351,35 @@ describe('WorkspaceBrowser', () => {
     fireEvent.click(archivedRow.querySelector('button[aria-label^="会话“gone-s”的操作"]') as HTMLElement)
     fireEvent.click(screen.getByRole('menuitem', { name: '取消归档' }))
     expect(unarchiveSession).toHaveBeenCalledWith(sid('gone-s'))
+  })
+
+  it('favorites a session from its row menu and renders the leading Favorites group', async () => {
+    const favoriteSession = vi.fn(async () => {})
+    const unfavoriteSession = vi.fn(async () => {})
+    const b = mount({
+      useSessions: hook(sessionState([summary('pinned-s', 2), summary('plain-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['pinned-s', 'plain-s'])])),
+      favoriteSession,
+      unfavoriteSession,
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    fireEvent.click(screen.getByRole('button', { name: '会话“pinned-s”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '收藏会话' }))
+    expect(favoriteSession).toHaveBeenCalledWith(sid('pinned-s'))
+
+    rerender(b, {
+      useWorkspaces: hook(workspaceState(
+        [workspace('alpha', ['pinned-s', 'plain-s'])],
+        [],
+        [sid('pinned-s')],
+      )),
+    })
+    expect(screen.getByText('已收藏')).toBeTruthy()
+    await waitFor(() => { expect(screen.getByText('pinned-s')).toBeTruthy() })
+    expect(screen.getAllByText('pinned-s')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '会话“pinned-s”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '取消收藏' }))
+    expect(unfavoriteSession).toHaveBeenCalledWith(sid('pinned-s'))
   })
 
   it('bulk archives only inactive idle sessions through the header dialog', async () => {

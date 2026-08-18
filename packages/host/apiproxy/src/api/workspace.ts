@@ -43,7 +43,11 @@ export interface WorkspaceApi {
    * `host/archived-sessions-changed`). Archived sessions stay in their
    * workspace's `sessionIds` account; grouping surfaces hide them.
    */
-  list(request: RpcRequest<{}>): Promise<RpcResponse<{ items: WorkspaceView[]; archivedSessionIds: SessionId[] }>>
+  list(request: RpcRequest<{}>): Promise<RpcResponse<{
+    items: WorkspaceView[]
+    archivedSessionIds: SessionId[]
+    favoriteSessionIds: SessionId[]
+  }>>
 
   /**
    * Creates (or idempotently resolves) a workspace over an EXISTING directory
@@ -115,4 +119,23 @@ export interface WorkspaceApi {
    */
   unarchiveSession(request: RpcRequest<{ sessionId: SessionId }>):
   Promise<RpcResponse<{ archivedSessionIds: SessionId[] }>>
+
+  /**
+   * Adds one session to the durable favorite (pinned) set: it moves to the
+   * top of every grouping surface. The session log and workspace accounting
+   * are untouched. Idempotent for an already favorited id. A session neither
+   * live nor in session persistence fails with `session-not-found`. Returns
+   * the full updated set.
+   */
+  favoriteSession(request: RpcRequest<{ sessionId: SessionId }>):
+  Promise<RpcResponse<{ favoriteSessionIds: SessionId[] }>>
+
+  /**
+   * Removes one session from the durable favorite set. The session log and
+   * workspace accounting slot stay untouched; only grouping visibility
+   * changes. Idempotent for an id outside the set. Returns the full updated
+   * set.
+   */
+  unfavoriteSession(request: RpcRequest<{ sessionId: SessionId }>):
+  Promise<RpcResponse<{ favoriteSessionIds: SessionId[] }>>
 }

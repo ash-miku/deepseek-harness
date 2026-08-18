@@ -18,6 +18,9 @@ export const UNGROUPED_LABEL = 'Ungrouped'
 /** Group key for sessions hidden from ordinary grouping by the archive set. */
 export const ARCHIVED_KEY = '__archived__'
 
+/** Group key for favorited (pinned) sessions rendered before ordinary groups. */
+export const FAVORITE_KEY = '__favorite__'
+
 /** One top-level session row in a group or the flat list. */
 export interface SessionNode {
   id: SessionId
@@ -35,6 +38,8 @@ export interface SessionNode {
   updatedAt: number
   /** The row is in the registry-global archive set (restore action instead of archive). */
   archived?: boolean
+  /** The row is in the registry-global favorite (pinned) set (unfavorite action instead of favorite). */
+  favorite?: boolean
 }
 
 /** Session order selected by the Workspace browser. */
@@ -48,6 +53,8 @@ export interface GroupNode {
   workspaceId: WorkspaceId | undefined
   /** The group is the registry-global archived-session bucket. */
   archived?: boolean
+  /** The group is the registry-global favorite (pinned) session bucket. */
+  favorite?: boolean
   cwd: string | undefined
   /** Workspace creation time (epoch ms); absent only for the ungrouped bucket. */
   createdAt: number | undefined
@@ -176,12 +183,14 @@ function orderedUngrouped(members: readonly SessionSummary[], stored: readonly s
  * Group Sessions by Host Workspace: one group per entity in stable Host
  * order, with members resolved from sessionIds in their stored order. Sessions
  * outside every Workspace trail in the browser-local Ungrouped order, which
- * falls back to recency before that order is initialized.
+ * falls back to recency before that order is initialized. Favorited sessions
+ * leave ordinary groups so the leading Favorites bucket owns their only copy.
  */
 function groupByWorkspace(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
   archived: ReadonlySet<SessionId>,
+  favorited: ReadonlySet<SessionId>,
   ungroupedOrder: readonly string[] | undefined,
 ): Group[] {
   const groups: Group[] = []
@@ -192,7 +201,7 @@ function groupByWorkspace(
       const summary = list.byId[id]
       if (summary === undefined) continue // account may lead the list pull; the row appears when the summary lands
       accounted.add(id)
-      if (!sessionVisible(summary, list.current, archived)) continue
+      if (!sessionVisible(summary, list.current, archived) || favorited.has(id)) continue
       members.push(summary)
     }
     groups.push(buildGroup(
@@ -203,7 +212,7 @@ function groupByWorkspace(
   const stray = list.ids
     .map(id => list.byId[id])
     .filter((s): s is SessionSummary =>
-      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived))
+      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived) && !favorited.has(s.id))
   if (stray.length > 0) {
     groups.push(buildGroup(
       UNGROUPED_KEY,
@@ -222,6 +231,7 @@ function sessionNode(
   s: SessionSummary,
   descendants: ReadonlyMap<SessionId, SubagentDescendantSummary>,
   archived = false,
+  favorite = false,
 ): SessionNode {
   return {
     id: s.id,
@@ -232,6 +242,7 @@ function sessionNode(
     completed: s.completed === true,
     updatedAt: s.updatedAt,
     ...(archived ? { archived: true } : {}),
+    ...(favorite ? { favorite: true } : {}),
     ...(s.pendingInteraction === undefined ? {} : { pendingInteraction: s.pendingInteraction }),
   }
 }
@@ -247,6 +258,7 @@ function sessionNode(
  * @param list - sessions list snapshot (`current` feeds containsCurrent).
  * @param workspaces - real workspaces in stable Host order.
  * @param archivedSessionIds - registry-global archive set.
+ * @param favoriteSessionIds - registry-global favorite (pinned) set.
  * @param view - local expansion arrays.
  * @returns group sections in render order.
  */
@@ -254,17 +266,47 @@ export function deriveGroups(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
   archivedSessionIds: readonly SessionId[],
+  favoriteSessionIds: readonly SessionId[],
   view: TreeView,
 ): GroupNode[] {
   const archived = new Set(archivedSessionIds)
+  const favorited = new Set(favoriteSessionIds)
   const expandedGroups = new Set(view.expandedGroups)
   const descendants = indexSubagentDescendants(list.byId)
   const currentGroup = list.current === undefined
     ? undefined
-    : (workspaces.find(w => w.sessionIds.includes(list.current as SessionId))?.workspaceId as string | undefined)
-        ?? UNGROUPED_KEY
+    : archived.has(list.current)
+      ? ARCHIVED_KEY
+      : favorited.has(list.current)
+        ? FAVORITE_KEY
+        : (workspaces.find(w => w.sessionIds.includes(list.current as SessionId))?.workspaceId as string | undefined)
+          ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, view.ungroupedOrder)) {
+
+  // Favorited (pinned) sessions first, before ordinary groups
+  const favoritedSessions = list.ids
+    .map(id => list.byId[id])
+    .filter((s): s is SessionSummary =>
+      s !== undefined && favorited.has(s.id) && sessionVisible(s, list.current, archived))
+  if (favoritedSessions.length > 0) {
+    const expanded = expandedGroups.has(FAVORITE_KEY)
+    groups.push({
+      key: FAVORITE_KEY,
+      workspaceId: undefined,
+      cwd: undefined,
+      createdAt: undefined,
+      favorite: true,
+      label: 'Favorites',
+      sessionCount: favoritedSessions.length,
+      expanded,
+      containsCurrent: list.current !== undefined && favorited.has(list.current),
+      sessions: expanded
+        ? favoritedSessions.sort(byRecency).map(session => sessionNode(session, descendants, false, true))
+        : [],
+    })
+  }
+
+  for (const g of groupByWorkspace(list, workspaces, archived, favorited, view.ungroupedOrder)) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,
@@ -275,7 +317,7 @@ export function deriveGroups(
       sessionCount: g.sessions.length,
       expanded,
       containsCurrent: g.key === currentGroup,
-      sessions: expanded ? g.sessions.map(session => sessionNode(session, descendants)) : [],
+      sessions: expanded ? g.sessions.map(session => sessionNode(session, descendants, false)) : [],
     })
   }
 
@@ -285,6 +327,7 @@ export function deriveGroups(
       s !== undefined && archived.has(s.id) && sessionVisible(s, list.current, new Set()))
   if (archivedSessions.length > 0) {
     const expanded = expandedGroups.has(ARCHIVED_KEY)
+    const favorite = new Set(favoriteSessionIds)
     groups.push({
       key: ARCHIVED_KEY,
       workspaceId: undefined,
@@ -296,7 +339,7 @@ export function deriveGroups(
       expanded,
       containsCurrent: list.current !== undefined && archived.has(list.current),
       sessions: expanded
-        ? archivedSessions.sort(byRecency).map(session => sessionNode(session, descendants, true))
+        ? archivedSessions.sort(byRecency).map(session => sessionNode(session, descendants, true, favorite.has(session.id)))
         : [],
     })
   }
@@ -311,13 +354,16 @@ export function deriveGroups(
  * derivation (see {@link deriveSearchResults}).
  * @param list - sessions list snapshot.
  * @param archivedSessionIds - registry-global archive set.
+ * @param favoriteSessionIds - registry-global favorite (pinned) set.
  * @returns flat rows in render order.
  */
 export function deriveFlat(
   list: SessionListState,
   archivedSessionIds: readonly SessionId[],
+  favoriteSessionIds: readonly SessionId[],
 ): SessionNode[] {
   const archived = new Set(archivedSessionIds)
+  const favorited = new Set(favoriteSessionIds)
   const descendants = indexSubagentDescendants(list.byId)
   const rows: SessionSummary[] = []
   for (const id of list.ids) {
@@ -326,7 +372,7 @@ export function deriveFlat(
     rows.push(s)
   }
   rows.sort(byRecency)
-  return rows.map(session => sessionNode(session, descendants, archived.has(session.id)))
+  return rows.map(session => sessionNode(session, descendants, archived.has(session.id), favorited.has(session.id)))
 }
 
 /** Relative-time bucket of a session row's trailing label. */

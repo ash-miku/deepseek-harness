@@ -229,4 +229,38 @@ export class TestWorkspaces implements IWorkspaces {
       draft.archivedSessionIds = draft.archivedSessionIds.filter(id => id !== sessionId)
     })
   }
+
+  /**
+   * Favorite (pin) a session (recorded). The default adds the id to the
+   * list state's favorite set.
+   * @param sessionId - session to favorite.
+   */
+  async favoriteSession(sessionId: SessionId): Promise<void> {
+    this.calls.push({ method: 'favoriteSession', args: [sessionId] })
+    const stub = this.stubs.get('favoriteSession')
+    if (stub !== undefined) {
+      await (stub(sessionId) as Promise<void>)
+      return
+    }
+    await this.update((draft) => {
+      draft.favoriteSessionIds = [...draft.favoriteSessionIds, sessionId]
+    })
+  }
+
+  /**
+   * Unfavorite (unpin) a session (recorded). The default removes the id
+   * from the list state's favorite set.
+   * @param sessionId - session to unfavorite.
+   */
+  async unfavoriteSession(sessionId: SessionId): Promise<void> {
+    this.calls.push({ method: 'unfavoriteSession', args: [sessionId] })
+    const stub = this.stubs.get('unfavoriteSession')
+    if (stub !== undefined) {
+      await (stub(sessionId) as Promise<void>)
+      return
+    }
+    await this.update((draft) => {
+      draft.favoriteSessionIds = draft.favoriteSessionIds.filter(id => id !== sessionId)
+    })
+  }
 }

@@ -7,6 +7,7 @@
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
   'group.ungrouped': '未分组',
+  'group.favorite': '已收藏',
   'group.archived': '已归档',
   'session.new': '新会话',
   'section.workspaces': '工作区',
@@ -56,6 +57,8 @@ export const zh = {
   'delete.desc': '将把“{name}”从工作区列表中移除。文件夹与会话记录会保留，其会话将显示在“未分组”下。',
   'delete.pending': '正在删除工作区…',
   'menu.fork': '分叉会话',
+  'menu.favoriteSession': '收藏会话',
+  'menu.unfavoriteSession': '取消收藏',
   'menu.archiveSession': '归档会话',
   'menu.unarchiveSession': '取消归档',
   'sessions.count.one': '{n} 个会话',
@@ -89,6 +92,7 @@ export type WorkspaceKey = keyof typeof zh
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
   'group.ungrouped': 'Ungrouped',
+  'group.favorite': 'Favorites',
   'group.archived': 'Archived',
   'session.new': 'New Session',
   'section.workspaces': 'Workspaces',
@@ -138,6 +142,8 @@ export const en = {
   'delete.desc': 'This removes “{name}” from the workspace list. The folder and session logs will be kept. Its sessions will appear under Ungrouped.',
   'delete.pending': 'Deleting workspace…',
   'menu.fork': 'Fork session',
+  'menu.favoriteSession': 'Favorite session',
+  'menu.unfavoriteSession': 'Unfavorite session',
   'menu.archiveSession': 'Archive session',
   'menu.unarchiveSession': 'Unarchive session',
   'sessions.count.one': '{n} session',

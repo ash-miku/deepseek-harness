@@ -133,6 +133,17 @@ export type WorkspaceBrowserInjected = DirectoryPickingInjected & {
    */
   unarchiveSession: (sessionId: SessionId) => Promise<void>
   /**
+   * Favorite (pin) a Session into the registry-global favorite set: it moves
+   * to the top of every grouping surface. Log and accounting slot are
+   * untouched.
+   */
+  favoriteSession: (sessionId: SessionId) => Promise<void>
+  /**
+   * Unfavorite (unpin) a Session from the registry-global favorite set.
+   * Log and accounting slot are untouched.
+   */
+  unfavoriteSession: (sessionId: SessionId) => Promise<void>
+  /**
    * Reorder a session inside its Workspace account (DOM-insertBefore
    * semantics: omitted anchor appends to the end). The view refreshes from
    * the Host response/changed frame; failures leave the order unchanged.

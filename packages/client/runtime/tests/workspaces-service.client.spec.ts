@@ -442,7 +442,7 @@ describe('WorkspaceRuntime', () => {
     expect(clear).toHaveBeenCalledOnce()
   })
 
-  it('archives a session, projects the set from the response, list, and frame, and clears only the current one', async () => {
+  it('archives a session, projects the set from the response, list, and frame, and keeps the current one open', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
     const sessions = new SessionRuntime(ctx, api, fakeRemote())
@@ -462,11 +462,12 @@ describe('WorkspaceRuntime', () => {
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle'])
     expect(sessions.list.getSnapshot().current).toBe('s-open')
 
-    // Archiving the current session clears it into the New Session view state.
+    // Archiving the current session keeps it open; the archived bucket is a
+    // visible read path, so it must not force the view back to New Session.
     api.onWorkspaceArchiveSession = () => Promise.resolve(ok({ archivedSessionIds: [sid('s-idle'), sid('s-open')] }))
     await workspaces.archiveSession(sid('s-open'))
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle', 's-open'])
-    expect(sessions.list.getSnapshot().current).toBeUndefined()
+    expect(sessions.list.getSnapshot().current).toBe('s-open')
 
     // A Host failure leaves the set and the selection untouched.
     api.onWorkspaceArchiveSession = () => Promise.resolve(err({
@@ -516,7 +517,7 @@ describe('WorkspaceRuntime', () => {
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-idle'])
   })
 
-  it('clears a current archived by a remote frame and shields the set from a stale in-flight baseline', async () => {
+  it('keeps a current archived by a remote frame and shields the set from a stale in-flight baseline', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()
     const sessions = new SessionRuntime(ctx, api, fakeRemote())
@@ -528,8 +529,8 @@ describe('WorkspaceRuntime', () => {
     sessions.open(sid('s-open'))
 
     // A stale baseline is in flight (older, empty set) when another tab's
-    // archive frame lands: the frame clears the current selection and its
-    // set survives the baseline's later resolution.
+    // archive frame lands: the current session stays readable and the set
+    // survives the baseline's later resolution.
     const gate = deferred<Awaited<ReturnType<FakeApiClient['onWorkspaceList']>>>()
     api.onWorkspaceList = () => gate.promise
     const hydration = workspaces.refresh()
@@ -538,12 +539,12 @@ describe('WorkspaceRuntime', () => {
       payload: { type: 'host/archived-sessions-changed', archivedSessionIds: [sid('s-open')] },
     } as never)
     await new Promise(resolve => setTimeout(resolve, 0))
-    expect(sessions.list.getSnapshot().current).toBeUndefined()
-    gate.resolve(ok({ items: [], archivedSessionIds: [] }))
+    expect(sessions.list.getSnapshot().current).toBe('s-open')
+    gate.resolve(ok({ items: [], archivedSessionIds: [], favoriteSessionIds: [] }))
     await hydration
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual(['s-open'])
     // The next (fresh) baseline is authoritative again.
-    api.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [] }) as never)
+    api.onWorkspaceList = () => Promise.resolve(ok({ items: [], archivedSessionIds: [], favoriteSessionIds: [] }) as never)
     await workspaces.refresh()
     expect(workspaces.list.getSnapshot().archivedSessionIds).toEqual([])
   })

@@ -1563,6 +1563,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
   // Registry-global archive set mirroring the host: archived sessions keep
   // their workspace accounting slot and only grouping surfaces hide them.
   const archivedSessionIds: SessionId[] = []
+  const favoriteSessionIds: SessionId[] = []
 
   // In-memory browse tree behind the fixture's `browse` picker capability —
   // deterministic content mirroring the design mock so assembled Web tests
@@ -2567,6 +2568,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       list: request => ok(request, {
         items: workspaces.map(w => ({ ...w })),
         archivedSessionIds: [...archivedSessionIds],
+        favoriteSessionIds: [...favoriteSessionIds],
       }),
       create: (request) => {
         const { path } = request.payload
@@ -2702,6 +2704,25 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           emitHost({ type: 'host/archived-sessions-changed', archivedSessionIds: [...archivedSessionIds] })
         }
         return ok(request, { archivedSessionIds: [...archivedSessionIds] })
+      },
+      favoriteSession: (request) => {
+        const missing = requireSession(request)
+        if (missing !== undefined) return missing
+        const { sessionId } = request.payload
+        if (!favoriteSessionIds.includes(sessionId)) {
+          favoriteSessionIds.push(sessionId)
+          emitHost({ type: 'host/favorite-sessions-changed', favoriteSessionIds: [...favoriteSessionIds] })
+        }
+        return ok(request, { favoriteSessionIds: [...favoriteSessionIds] })
+      },
+      unfavoriteSession: (request) => {
+        const { sessionId } = request.payload
+        const index = favoriteSessionIds.indexOf(sessionId)
+        if (index !== -1) {
+          favoriteSessionIds.splice(index, 1)
+          emitHost({ type: 'host/favorite-sessions-changed', favoriteSessionIds: [...favoriteSessionIds] })
+        }
+        return ok(request, { favoriteSessionIds: [...favoriteSessionIds] })
       },
     },
     agentPresets: {
@@ -3123,6 +3144,8 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'workspace.insertSessionBefore': return this.api.workspace.insertSessionBefore(request)
       case 'workspace.archiveSession': return this.api.workspace.archiveSession(request)
       case 'workspace.unarchiveSession': return this.api.workspace.unarchiveSession(request)
+      case 'workspace.favoriteSession': return this.api.workspace.favoriteSession(request)
+      case 'workspace.unfavoriteSession': return this.api.workspace.unfavoriteSession(request)
       case 'skill.list': return this.api.skills.list(request)
       case 'agentPreset.list': return this.api.agentPresets.list(request)
       case 'agentPreset.select': return this.api.agentPresets.select(request)

@@ -97,4 +97,15 @@ export interface IWorkspaces {
    * @param sessionId - session to restore.
    */
   unarchiveSession(sessionId: SessionId): Promise<void>
+  /**
+   * Favorite (pin) a session into the registry-global set: it moves to the
+   * top of every grouping surface. Log and accounting slot remain.
+   * @param sessionId - session to favorite.
+   */
+  favoriteSession(sessionId: SessionId): Promise<void>
+  /**
+   * Unfavorite (unpin) a session from the registry-global set.
+   * @param sessionId - session to unfavorite.
+   */
+  unfavoriteSession(sessionId: SessionId): Promise<void>
 }

@@ -29,6 +29,7 @@ export const workspaceListRequestSchema = z.object({}) satisfies z.ZodType<Wire<
 export const workspaceListValueSchema = z.object({
   items: z.array(workspaceViewSchema),
   archivedSessionIds: z.array(sessionIdSchema),
+  favoriteSessionIds: z.array(sessionIdSchema),
 }) satisfies z.ZodType<Wire<ResponseValue<'workspace.list'>>>
 
 /** workspace.create request payload: the existing directory to adopt. */
@@ -108,3 +109,23 @@ export const workspaceUnarchiveSessionRequestSchema = z.object({
 export const workspaceUnarchiveSessionValueSchema = z.object({
   archivedSessionIds: z.array(sessionIdSchema),
 }) satisfies z.ZodType<Wire<ResponseValue<'workspace.unarchiveSession'>>>
+
+/** workspace.favoriteSession request payload. */
+export const workspaceFavoriteSessionRequestSchema = z.object({
+  sessionId: sessionIdSchema,
+}) satisfies z.ZodType<Wire<RequestPayload<'workspace.favoriteSession'>>>
+
+/** workspace.favoriteSession response value: the full updated favorite set. */
+export const workspaceFavoriteSessionValueSchema = z.object({
+  favoriteSessionIds: z.array(sessionIdSchema),
+}) satisfies z.ZodType<Wire<ResponseValue<'workspace.favoriteSession'>>>
+
+/** workspace.unfavoriteSession request payload. */
+export const workspaceUnfavoriteSessionRequestSchema = z.object({
+  sessionId: sessionIdSchema,
+}) satisfies z.ZodType<Wire<RequestPayload<'workspace.unfavoriteSession'>>>
+
+/** workspace.unfavoriteSession response value: the full updated favorite set. */
+export const workspaceUnfavoriteSessionValueSchema = z.object({
+  favoriteSessionIds: z.array(sessionIdSchema),
+}) satisfies z.ZodType<Wire<ResponseValue<'workspace.unfavoriteSession'>>>

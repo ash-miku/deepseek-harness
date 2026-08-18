@@ -24,6 +24,8 @@ import {
   workspaceUnarchiveSessionRequestSchema, workspaceUnarchiveSessionValueSchema,
   workspaceCreateRequestSchema, workspaceCreateValueSchema, workspaceIdSchema,
   workspaceDeleteRequestSchema, workspaceDeleteValueSchema,
+  workspaceFavoriteSessionRequestSchema, workspaceFavoriteSessionValueSchema,
+  workspaceUnfavoriteSessionRequestSchema, workspaceUnfavoriteSessionValueSchema,
   workspaceInsertBeforeRequestSchema, workspaceInsertBeforeValueSchema,
   workspaceInsertSessionBeforeRequestSchema, workspaceInsertSessionBeforeValueSchema,
   workspaceListRequestSchema, workspaceListValueSchema,
@@ -357,7 +359,7 @@ describe('workspace domain schemas', () => {
     expect(workspaceViewSchema.parse(view).sessionIds).toEqual(['s1'])
     expect(() => workspaceViewSchema.parse({ ...view, sessionIds: 's1' })).toThrow()
     expect(workspaceListRequestSchema.parse({})).toEqual({})
-    expect(workspaceListValueSchema.parse({ items: [view], archivedSessionIds: ['s1'] }).items).toHaveLength(1)
+    expect(workspaceListValueSchema.parse({ items: [view], archivedSessionIds: ['s1'], favoriteSessionIds: [] }).items).toHaveLength(1)
     expect(() => workspaceListValueSchema.parse({ items: [view] })).toThrow()
   })
 
@@ -375,6 +377,22 @@ describe('workspace domain schemas', () => {
     expect(workspaceUnarchiveSessionValueSchema.parse({ archivedSessionIds: ['s2'] }).archivedSessionIds)
       .toEqual(['s2'])
     expect(() => workspaceUnarchiveSessionValueSchema.parse({ archivedSessionIds: 's2' })).toThrow()
+  })
+
+  it('favoriteSession request/value carry the id and the full updated set', () => {
+    expect(workspaceFavoriteSessionRequestSchema.parse({ sessionId: 's1' }).sessionId).toBe('s1')
+    expect(() => workspaceFavoriteSessionRequestSchema.parse({})).toThrow()
+    expect(workspaceFavoriteSessionValueSchema.parse({ favoriteSessionIds: ['s1', 's2'] }).favoriteSessionIds)
+      .toEqual(['s1', 's2'])
+    expect(() => workspaceFavoriteSessionValueSchema.parse({ favoriteSessionIds: 's1' })).toThrow()
+  })
+
+  it('unfavoriteSession request/value carry the id and the full updated set', () => {
+    expect(workspaceUnfavoriteSessionRequestSchema.parse({ sessionId: 's2' }).sessionId).toBe('s2')
+    expect(() => workspaceUnfavoriteSessionRequestSchema.parse({})).toThrow()
+    expect(workspaceUnfavoriteSessionValueSchema.parse({ favoriteSessionIds: ['s1'] }).favoriteSessionIds)
+      .toEqual(['s1'])
+    expect(() => workspaceUnfavoriteSessionValueSchema.parse({ favoriteSessionIds: 's2' })).toThrow()
   })
 
   it('insertSessionBefore accepts an anchored and an anchorless move', () => {

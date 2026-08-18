@@ -235,6 +235,15 @@ export class WorkspaceRegistry extends Service {
   }
 
   /**
+   * The durable favorite (pinned) set: sessions ordered by the time they were
+   * added. Browsing surfaces render these first, before ordinary groups.
+   * @returns the favorited session ids in favorite order.
+   */
+  get favoriteSessionIds(): readonly SessionId[] {
+    return this.requireState().favoriteSessionIds
+  }
+
+  /**
    * Archive one session durably. The session must exist (live or in session
    * persistence); its workspace accounting — or lack of one — is irrelevant.
    * An already archived id resolves without writing.
@@ -269,6 +278,42 @@ export class WorkspaceRegistry extends Service {
       await this.setState({
         ...state,
         archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
+      })
+    })
+  }
+
+  /**
+   * Favorite (pin) a session durably. The session must exist (live or in
+   * session persistence); its workspace accounting is irrelevant.
+   * An already favorited id resolves without writing.
+   * @param sessionId - The session to favorite.
+   * @returns resolution after durability.
+   */
+  favoriteSession(sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      if (this.requireState().favoriteSessionIds.includes(sessionId)) return
+      if (!(await this.sessionKnown(sessionId))) {
+        throw new WorkspaceUnknownSessionError(sessionId)
+      }
+      const state = this.requireState()
+      await this.setState({ ...state, favoriteSessionIds: [...state.favoriteSessionIds, sessionId] })
+    })
+  }
+
+  /**
+   * Unfavorite (unpin) a session by removing it from the durable favorite
+   * set. The session log and workspace accounting slot are untouched.
+   * An id outside the set is an idempotent no-op.
+   * @param sessionId - The session to unfavorite.
+   * @returns resolution after durability.
+   */
+  unfavoriteSession(sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      if (!this.requireState().favoriteSessionIds.includes(sessionId)) return
+      const state = this.requireState()
+      await this.setState({
+        ...state,
+        favoriteSessionIds: state.favoriteSessionIds.filter(id => id !== sessionId),
       })
     })
   }
@@ -350,6 +395,7 @@ export class WorkspaceRegistry extends Service {
         initialized: true,
         workspaceIds: [id, ...state.workspaceIds],
         archivedSessionIds: state.archivedSessionIds,
+        favoriteSessionIds: state.favoriteSessionIds,
       })
     } catch (error) {
       this.entities.delete(id)
@@ -382,6 +428,7 @@ export class WorkspaceRegistry extends Service {
       initialized: true,
       workspaceIds: state.workspaceIds.filter(workspaceId => workspaceId !== id),
       archivedSessionIds: state.archivedSessionIds,
+      favoriteSessionIds: state.favoriteSessionIds,
     }
     await this.setState({
       ...nextState,
@@ -439,6 +486,7 @@ export class WorkspaceRegistry extends Service {
       initialized: state.initialized,
       workspaceIds: state.workspaceIds,
       archivedSessionIds: state.archivedSessionIds,
+      favoriteSessionIds: state.favoriteSessionIds,
     })
   }
 
@@ -521,9 +569,19 @@ export class WorkspaceRegistry extends Service {
       .map(([id]) => id)
 
     if (!sameIds(state.workspaceIds, workspaceIds)) {
-      await this.setState({ initialized: false, workspaceIds, archivedSessionIds: state.archivedSessionIds })
+      await this.setState({
+        initialized: false,
+        workspaceIds,
+        archivedSessionIds: state.archivedSessionIds,
+        favoriteSessionIds: state.favoriteSessionIds,
+      })
     }
-    await this.setState({ initialized: true, workspaceIds, archivedSessionIds: state.archivedSessionIds })
+    await this.setState({
+      initialized: true,
+      workspaceIds,
+      archivedSessionIds: state.archivedSessionIds,
+      favoriteSessionIds: state.favoriteSessionIds,
+    })
   }
 
   private validateStoredState(state: WorkspaceDomainState): void {
