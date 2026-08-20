@@ -304,15 +304,6 @@ export class FakeApiClient implements IApiClient {
     discoverModels: payload => this.record('llm.discoverModels', payload, Promise.resolve(ok({ models: [] }))),
   }
 
-  readonly deepseek: IApiClient['deepseek'] = {
-    balance: payload => this.record('deepseek.balance', payload, Promise.resolve(ok({
-      balance: {
-        isAvailable: true, currency: 'CNY', totalBalance: '110.00',
-        grantedBalance: '10.00', toppedUpBalance: '100.00', cachedAt: 0,
-      },
-    }))),
-  }
-
   /** When true, streams never fire onOpen (misbehaving-carrier material for the handshake timeout guard). */
   suppressStreamOpen = false
 

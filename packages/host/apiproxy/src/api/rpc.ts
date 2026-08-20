@@ -86,8 +86,6 @@ export interface RpcErrorDetailsMap {
    * details name the endpoint asked, never the credential offered.
    */
   'model-discovery-failed': { settingsNs: string; baseURL?: string }
-  /** The DeepSeek account-balance read failed (credential, upstream, or non-200); the message is the upstream's own text. */
-  'deepseek-balance-unavailable': {}
   'title-invalid': { sessionId: SessionId }
   'fork-unavailable': { sessionId: SessionId }
   'subagent-parent-unavailable': { parentSessionId: SessionId }

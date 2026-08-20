@@ -291,22 +291,6 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { models: [] } } }
       },
     },
-    deepseek: {
-      async balance(request) {
-        return {
-          rpcId: request.rpcId,
-          result: {
-            ok: true,
-            value: {
-              balance: {
-                isAvailable: true, currency: 'CNY', totalBalance: '110.00',
-                grantedBalance: '10.00', toppedUpBalance: '100.00', cachedAt: 1234,
-              },
-            },
-          },
-        }
-      },
-    },
     events: {
       mux: (_request, signal) => stream(muxFrames, signal),
       host: (_request, signal) => stream(hostFrames, signal),

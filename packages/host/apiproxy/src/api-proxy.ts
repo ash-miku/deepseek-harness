@@ -40,7 +40,7 @@ import type {
   ModelCatalogFailure, ModelProviderGroup,
   ModelReasoning, MuxFrame, PromptContentPart, QuestionResponsePayload, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem,
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
-  WorkspaceId, WorkspaceView, DeepseekBalanceView,
+  WorkspaceId, WorkspaceView,
 } from './api/index.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
@@ -1105,94 +1105,6 @@ function changedWorkspaceView(workspaceId: string, value: unknown): WorkspaceVie
  * @param defaults - host routing and project-directory defaults.
  * @returns the ApiProxy implementation.
  */
-/** DeepSeek account-balance endpoint (the official API, not the search base). */
-const DEEPSEEK_BALANCE_URL = 'https://api.deepseek.com/user/balance'
-/** Credential reference backing the balance read — the same key the llm/search adapters use. */
-const DEEPSEEK_BALANCE_KEY_REF = 'DEEPSEEK_API_KEY'
-/** Optional platform session token enabling the private usage/cost endpoint. */
-const DEEPSEEK_PLATFORM_TOKEN_REF = 'DEEPSEEK_PLATFORM_TOKEN'
-/** Private platform usage endpoint matching the official usage page; requires browser-like headers. */
-const DEEPSEEK_COST_URL = 'https://platform.deepseek.com/api/v0/usage/by_api_key/cost'
-const DEEPSEEK_COST_HEADERS = {
-  Accept: 'application/json',
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-  Origin: 'https://platform.deepseek.com',
-  Referer: 'https://platform.deepseek.com/usage',
-  'Sec-Fetch-Dest': 'empty',
-  'Sec-Fetch-Mode': 'cors',
-  'Sec-Fetch-Site': 'same-origin',
-} as const
-/** Host-side cache TTL for a balance reading (a settings-surface poll must not hammer upstream). */
-const DEEPSEEK_BALANCE_TTL_MS = 5 * 60_000
-
-/** One hourly cost bucket of the platform by_api_key payload. */
-interface DeepseekUsageCostBucket {
-  time?: number
-  cost?: string
-}
-
-/** One API-key/model series of the platform by_api_key payload. */
-interface DeepseekUsageCostSeries {
-  model?: string
-  buckets?: DeepseekUsageCostBucket[]
-}
-
-/** Currency group of the platform by_api_key payload. */
-interface DeepseekUsageCostGroup {
-  currency?: string
-  series?: DeepseekUsageCostSeries[]
-}
-
-/** Narrow wire shape of the platform by_api_key cost payload. */
-interface DeepseekUsageCostResponse {
-  code?: number
-  data?: {
-    biz_code?: number
-    biz_data?: {
-      data?: DeepseekUsageCostGroup[]
-    }
-  }
-}
-
-/**
- * Query the same platform usage endpoint the official page uses and sum the
- * current local day's buckets. Browser-like headers and an aligned full-day
- * range are required by the platform WAF.
- */
-async function fetchDeepseekTodayCost(platformToken: string): Promise<{ cost: string; currency: string }> {
-  const now = new Date()
-  const startSec = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000)
-  const tzOffsetSec = -now.getTimezoneOffset() * 60
-  const params = new URLSearchParams({
-    start: String(startSec),
-    end: String(startSec + 86_400),
-    tz: String(tzOffsetSec),
-  })
-  const response = await fetch(`${DEEPSEEK_COST_URL}?${params.toString()}`, {
-    headers: { Authorization: `Bearer ${platformToken}`, ...DEEPSEEK_COST_HEADERS },
-  })
-  if (!response.ok) {
-    throw new Error(`DeepSeek usage request failed: HTTP ${response.status}`)
-  }
-  const body = await response.json() as DeepseekUsageCostResponse
-  if (body.code !== undefined && body.code !== 0) {
-    throw new Error(`DeepSeek usage request failed: code ${body.code}`)
-  }
-  const data = body.data
-  if (data?.biz_code !== undefined && data.biz_code !== 0) {
-    throw new Error(`DeepSeek usage request failed: biz_code ${data.biz_code}`)
-  }
-  const groups = data?.biz_data?.data ?? []
-  const group = groups.find(candidate => candidate.currency === 'CNY') ?? groups[0]
-  let cost = 0
-  for (const series of group?.series ?? []) {
-    for (const bucket of series.buckets ?? []) {
-      cost += Number.parseFloat(bucket.cost ?? '0') || 0
-    }
-  }
-  return { cost: cost.toFixed(2), currency: group?.currency ?? 'CNY' }
-}
-
 export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiProxy {
   const sessionExportCompressionLevel = defaults.sessionExportCompressionLevel
     ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL
@@ -1217,8 +1129,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const sessionCreations = new Map<SessionId, Promise<Agent>>()
   /** Serializes path ownership and explicit title checks with Workspace mutations. */
   let workspaceCreationChain = Promise.resolve()
-  /** DeepSeek balance cache: last reading + its timestamp, keyed by credential ref. */
-  const deepseekBalanceCache = new Map<string, { view: DeepseekBalanceView; at: number }>()
   const pendingQuestions = new Map<RpcId, PendingQuestion>()
   const pendingApprovals = new Map<RpcId, PendingApproval>()
   const muxQueues = new Set<FrameQueue<RpcRequest<MuxFrame>>>()
@@ -3541,85 +3451,6 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             code: 'model-discovery-failed',
             message: error instanceof Error ? error.message : String(error),
             details: { settingsNs, ...baseURL === undefined ? {} : { baseURL } },
-          })
-        }
-      },
-    },
-
-    deepseek: {
-      async balance(request) {
-        const credentials = ctx.get('credentials')
-        if (credentials === undefined) return err(request, credentialsAbsent())
-        const ref = credentialRef(DEEPSEEK_BALANCE_KEY_REF)
-        const key = (await credentials.resolve(ref))?.value
-        if (key === undefined || key.length === 0) {
-          return err(request, {
-            code: 'deepseek-balance-unavailable',
-            message: 'DeepSeek API key is not configured (DEEPSEEK_API_KEY)',
-            details: {},
-          })
-        }
-        // Serve a fresh cached reading; force bypasses and re-queries upstream.
-        const cached = deepseekBalanceCache.get(DEEPSEEK_BALANCE_KEY_REF)
-        if (!request.payload.force && cached !== undefined && Date.now() - cached.at < DEEPSEEK_BALANCE_TTL_MS) {
-          return ok(request, { balance: cached.view })
-        }
-        try {
-          const response = await fetch(DEEPSEEK_BALANCE_URL, {
-            headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
-          })
-          if (!response.ok) {
-            return err(request, {
-              code: 'deepseek-balance-unavailable',
-              message: `DeepSeek balance request failed: HTTP ${response.status}`,
-              details: {},
-            })
-          }
-          const body = await response.json() as {
-            is_available?: boolean
-            balance_infos?: Array<{
-              currency?: string
-              total_balance?: string
-              granted_balance?: string
-              topped_up_balance?: string
-            }>
-          }
-          const info = body.balance_infos?.[0]
-          if (info === undefined) {
-            return err(request, {
-              code: 'deepseek-balance-unavailable',
-              message: 'DeepSeek balance response carried no balance_infos entry',
-              details: {},
-            })
-          }
-          const view: DeepseekBalanceView = {
-            isAvailable: body.is_available ?? false,
-            currency: info.currency ?? '',
-            totalBalance: info.total_balance ?? '0',
-            grantedBalance: info.granted_balance ?? '0',
-            toppedUpBalance: info.topped_up_balance ?? '0',
-            cachedAt: Date.now(),
-          }
-          // Today's usage cost is an optional enhancement. A missing or stale
-          // platform session must not hide the API-key balance.
-          const platformToken = (await credentials.resolve(credentialRef(DEEPSEEK_PLATFORM_TOKEN_REF)))?.value
-          if (platformToken !== undefined && platformToken.length > 0) {
-            try {
-              const today = await fetchDeepseekTodayCost(platformToken)
-              view.todayCost = today.cost
-              view.todayCurrency = today.currency
-            } catch (error: unknown) {
-              // Keep the balance; the surface shows only the available fields.
-              console.warn('deepseek today-cost read failed:', error instanceof Error ? error.message : String(error))
-            }
-          }
-          deepseekBalanceCache.set(DEEPSEEK_BALANCE_KEY_REF, { view, at: Date.now() })
-          return ok(request, { balance: view })
-        } catch (error: unknown) {
-          return err(request, {
-            code: 'deepseek-balance-unavailable',
-            message: error instanceof Error ? error.message : String(error),
-            details: {},
           })
         }
       },
