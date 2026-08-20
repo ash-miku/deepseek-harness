@@ -42,9 +42,8 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
 
   // The sidebar renders from the boot graph: every inject layer activated.
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
-  // The official wordmark is preferred; a profile may intentionally keep the
-  // local fallback brand while still mounting the complete built graph.
-  expect(document.querySelector('svg[viewBox="26 0 156 24"]') ?? screen.queryByText('DSH Local Build')).not.toBeNull()
+  // This branch ships the official brand profile; the local shell fallback must not appear.
+  expect(document.querySelector('svg[viewBox="26 0 156 24"]')).not.toBeNull()
   // The compact layout dropped group session counts; the fixture workspace
   // group row renders immediately with its sessions beneath it.
   const fixtureGroup = (await within(tree).findAllByText('fixture'))
