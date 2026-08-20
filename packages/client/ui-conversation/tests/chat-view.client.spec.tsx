@@ -486,6 +486,33 @@ describe('ChatView', () => {
     expect(view.queryByText('点击收起')).toBeNull()
   })
 
+  it('keeps a steered answer below its interjection in fold mode', () => {
+    const h = makeHarness({
+      nodes: [
+        user(1, 'do the thing'),
+        thinkingAssistant(2, 'First process', 'First answer'),
+        {
+          kind: 'steering',
+          messageId: 'steering-message' as never,
+          seq: 3,
+          time: 3_000,
+          content: [{ type: 'text', text: 'redirect' }],
+          source: { kind: 'user' },
+        },
+        thinkingAssistant(4, 'Second process', 'Second answer'),
+      ],
+    })
+    h.props.displayMode = createSnapshotStore<'full' | 'fold' | 'conclusion'>('fold')
+    const view = render(<h.ChatView {...h.props} />)
+
+    const firstAnswer = view.getByText('First answer')
+    const steering = view.getByText('redirect')
+    const secondAnswer = view.getByText('Second answer')
+    expect(firstAnswer.compareDocumentPosition(steering) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(steering.compareDocumentPosition(secondAnswer) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(view.getAllByText('过程')).toHaveLength(2)
+  })
+
   it('renders Host-pending steering at the flow tail and hands off to the durable node', () => {
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {

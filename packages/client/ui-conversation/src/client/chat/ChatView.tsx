@@ -286,68 +286,51 @@ export function ChatView({
     const empty: UnifiedFoldPlan = { processByKey: new Map(), answerByKey: new Map() }
     if (displayMode !== 'fold') return empty
 
-    const processTurns = new Set<number>()
+    const groups: UnifiedFoldGroup[] = []
+    let current: UnifiedFoldGroup | undefined
+    // Visible input/context nodes split one turn into transcript segments. Keep
+    // each fold group inside one segment so a later answer stays below steering.
     for (const key of order) {
       const node = nodeStore.get(key) as ChatNode | undefined
       const turn = nodeTurn(node)
-      if (turn === undefined) continue
-      if (
-        node?.kind === 'tool-call'
+      const process = node?.kind === 'tool-call'
         || (node?.kind === 'assistant-step' && reasoningBlockCount(node.data.blocks) > 0)
-      ) {
-        processTurns.add(turn)
+      const answer = node?.kind === 'assistant-step' && hasAnswerBlocks(node.data.blocks)
+      if (turn === undefined || (!process && !answer)) {
+        current = undefined
+        continue
       }
-    }
-    if (processTurns.size === 0) return empty
-
-    const processKeys = new Map<number, string[]>()
-    const answerKeys = new Map<number, string[]>()
-    const counts = new Map<number, { reasoning: number; tools: number }>()
-    for (const key of order) {
-      const node = nodeStore.get(key) as ChatNode | undefined
-      const turn = nodeTurn(node)
-      if (turn === undefined || !processTurns.has(turn)) continue
-      if (node?.kind === 'tool-call') {
-        const list = processKeys.get(turn) ?? []
-        list.push(key)
-        processKeys.set(turn, list)
-        const count = counts.get(turn) ?? { reasoning: 0, tools: 0 }
-        count.tools += 1
-        counts.set(turn, count)
-      } else if (node?.kind === 'assistant-step') {
-        const reasoning = reasoningBlockCount(node.data.blocks)
-        if (reasoning > 0) {
-          const list = processKeys.get(turn) ?? []
-          list.push(key)
-          processKeys.set(turn, list)
-          const count = counts.get(turn) ?? { reasoning: 0, tools: 0 }
-          count.reasoning += reasoning
-          counts.set(turn, count)
+      if (current?.turn !== turn) current = undefined
+      // Answer-only rows before the first process row remain in log order.
+      if (current === undefined && !process) continue
+      if (current === undefined) {
+        current = {
+          key: `process:${turn}:${key}`,
+          turn,
+          processKeys: [],
+          answerKeys: [],
+          reasoningCount: 0,
+          toolCount: 0,
         }
-        if (hasAnswerBlocks(node.data.blocks)) {
-          const list = answerKeys.get(turn) ?? []
-          list.push(key)
-          answerKeys.set(turn, list)
-        }
+        groups.push(current)
       }
+      const reasoning = node.kind === 'assistant-step' ? reasoningBlockCount(node.data.blocks) : 0
+      const next: UnifiedFoldGroup = {
+        ...current,
+        processKeys: process ? [...current.processKeys, key] : current.processKeys,
+        answerKeys: answer ? [...current.answerKeys, key] : current.answerKeys,
+        reasoningCount: current.reasoningCount + reasoning,
+        toolCount: current.toolCount + (node.kind === 'tool-call' ? 1 : 0),
+      }
+      groups[groups.length - 1] = next
+      current = next
     }
 
     const processByKey = new Map<string, UnifiedFoldGroup>()
     const answerByKey = new Map<string, UnifiedFoldGroup>()
-    for (const turn of [...processTurns].sort((left, right) => left - right)) {
-      const process = processKeys.get(turn) ?? []
-      const answer = answerKeys.get(turn) ?? []
-      const count = counts.get(turn) ?? { reasoning: 0, tools: 0 }
-      const group: UnifiedFoldGroup = {
-        key: `process:${turn}`,
-        turn,
-        processKeys: process,
-        answerKeys: answer,
-        reasoningCount: count.reasoning,
-        toolCount: count.tools,
-      }
-      for (const key of process) processByKey.set(key, group)
-      for (const key of answer) answerByKey.set(key, group)
+    for (const group of groups) {
+      for (const key of group.processKeys) processByKey.set(key, group)
+      for (const key of group.answerKeys) answerByKey.set(key, group)
     }
     return { processByKey, answerByKey }
   }, [displayMode, order, nodeStore])
