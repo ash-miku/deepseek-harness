@@ -285,7 +285,7 @@ describe('ProducedFiles row', () => {
   ): Pick<ProducedFilesProps, 'useHostDescription'> => {
     const description = canOpenPath === undefined
       ? undefined
-      : { version: 'test', cwd: '/workspace', attachedSessions: 1, canOpenPath }
+      : { version: 'test', cwd: '/workspace', attachedSessions: 1, home: '/h', canOpenPath }
     return {
       useHostDescription: selector => selector(description),
     }

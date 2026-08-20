@@ -59,7 +59,7 @@ describe('ThemeRuntime', () => {
     theme.setFontScale('large')
     expect(events).toHaveLength(1)
     expect(host.set).toHaveBeenCalledOnce()
-    expect(() => theme.setFontScale('huge')).toThrow('not supported')
+    expect(() => { theme.setFontScale('huge') }).toThrow('not supported')
   })
 
   it('adopts a published Host section without writing it back', () => {

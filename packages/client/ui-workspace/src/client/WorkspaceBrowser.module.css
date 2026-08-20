@@ -512,6 +512,10 @@
   border: none;
   border-radius: 22px;
   outline: none;
+  /* This compact elevated selector owns its surface level; the scrolling list
+     inherits the sidebar's quiet/revealed scrollbar state instead. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
   background: var(--dsw-alias-bg-module-platform);
   font-size: 14px;
   line-height: 22px;

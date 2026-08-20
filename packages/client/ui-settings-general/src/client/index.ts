@@ -10,7 +10,6 @@
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
 // Type-only: the settings slot declarations plus the ctx.settingsScope Context
 // merge. Cross-plugin collaboration goes through the service, never a value
 // import (client bundle purity gate).
@@ -25,7 +24,7 @@ import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
 import { SettingsDocumentAction } from './SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.tsx'
-import { refreshDocumentIfLoaded, SettingsDocumentStore } from './settings-document-store.ts'
+import { SettingsDocumentStore } from './settings-document-store.ts'
 import { en, zh, type SettingsKey } from './locales.ts'
 
 export type {
@@ -54,7 +53,7 @@ const NS = 'settings'
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registrations depend on their slots through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection']
+export const inject = ['slots', 'locale', 'connection', 'settingsScope']
 
 /**
  * Register the `settings` dictionaries, the chrome content, and the General
@@ -69,15 +68,14 @@ export function apply(ctx: ClientContext): void {
   // locale/change re-registration wiring.
   const t = ctx.locale.bind(NS)
   const connection = ctx.get('connection') as ConnectionHandle
-  const documentController = new SettingsDocumentStore(connection.api)
-  const documentInjected = (): SettingsDocumentActionInjected => {
-    const useSnapshot = bindSnapshotSelector(documentController.store)
-    return { controller: documentController, useSnapshot }
-  }
-  // The local-document action drives the Host desktop, so it registers only
-  // once the /api trust fence has accepted this page: loopback qualifies at
-  // once, and a LAN/ZeroTier page qualifies the moment the connection settles
-  // (the host.describe riding the same fence has already succeeded by then).
+  // The action follows the shared describe mirror, whose owning plugin
+  // refreshes it on document commits and reconnects. A non-loopback page may
+  // register once the host-description trust handshake has settled.
+  const documentController = new SettingsDocumentStore(connection.api, ctx.settingsScope.describe())
+  const documentInjected = (): SettingsDocumentActionInjected => ({
+    controller: documentController,
+    hooks: { snapshot: documentController.store },
+  })
   let documentActionRegistered = false
   const registerDocumentAction = (): void => {
     if (documentActionRegistered) return
@@ -91,12 +89,18 @@ export function apply(ctx: ClientContext): void {
       inject: documentInjected,
     }, SettingsDocumentAction))
   }
-  registerDocumentAction()
-  ctx.effect(() => connection.hostDescription.subscribe(registerDocumentAction),
-    'ui-settings-general: document-action fence trust')
-  ctx.effect(() => ctx.on('connection/reset', () => {
-    refreshDocumentIfLoaded(documentController)
-  }), 'ui-settings-general: metadata invalidations')
+  ctx.effect(() => {
+    const reset = ctx.on('connection/reset', registerDocumentAction)
+    const disposers: Array<() => void> = [() => { reset() }]
+    if (!connection.isLoopback) {
+      disposers.push(connection.hostDescription.subscribe(registerDocumentAction))
+    }
+    registerDocumentAction()
+    return () => {
+      for (const dispose of disposers) dispose()
+      documentController.dispose()
+    }
+  }, 'ui-settings-general: document action directory')
   // The settings shell: this package occupies the sidebar-owned hole and
   // declares the settings slots. Ledger → nav-row projection as an observable
   // source (uSES contract: getSnapshot returns the cached rows until the

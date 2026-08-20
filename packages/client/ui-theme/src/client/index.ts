@@ -18,6 +18,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { AppearanceRowInjected } from './AppearanceRow.tsx'
 import { AppearanceRow } from './AppearanceRow.tsx'
 import { createAppearanceRowStore } from './settings-store.ts'
+import { installThemeStyles } from './styles.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
 import {
   DEFAULT_FONT_SCALE, DEFAULT_PREFERENCE, FONT_SCALE_FIELD, FONT_SCALES, isFontScale, isThemePreference,
@@ -252,7 +253,7 @@ export class ThemeRuntime {
   private adopt(): void {
     const section = this.host.getSnapshot().value
     if (section === undefined) return
-    const fontScale = section.fontScale ?? DEFAULT_FONT_SCALE
+    const fontScale = section.fontScale
     const preferenceChanged = this.preference !== section.preference
     const fontScaleChanged = this.fontScale !== fontScale
     if (!preferenceChanged && !fontScaleChanged) return
@@ -396,7 +397,7 @@ function dynamicToken(name: string): ThemeTokenInspection {
 /**
  * Required services: settings transport plus slots/locale for the Appearance
  * row. `remote` carries the forwarded settings invalidation that
- * `bindSettingsScope` subscribes to on this context.
+ * `ctx.settingsScope.bind(spec)` subscribes to on this context.
  */
 export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
 
@@ -407,6 +408,7 @@ export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope
  * @param ctx - client cordis context.
  */
 export function apply(ctx: ClientContext): void {
+  installThemeStyles(ctx)
   const host = ctx.settingsScope.bind<ThemeSettings>({ namespace: THEME_SETTINGS_NAMESPACE })
   const theme = new ThemeRuntime(ctx, host)
   ctx.provide('theme', theme)

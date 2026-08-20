@@ -39,7 +39,20 @@
   - button "跟随系统" [pressed]:
     - img
     - text: 跟随系统
+  - text: 字体大小
+  - button "小"
+  - button "标准" [pressed]
+  - button "大"
+  - button "特大"
+  - text: 过程内容展示 控制思考摘要和工具调用在对话中的展示方式；折叠时统一收纳过程，正式回答展示在下方
+  - button "完整过程":
+    - text: 完整过程
+    - img
   - text: 繁忙时 Enter 键行为 仅在智能体运行时生效；Cmd/Ctrl+Enter 使用另一行为
   - button "排队发送":
     - text: 排队发送
     - img
+  - text: 运行中提示文案 每行填一条，运行时随机轮换；留空恢复默认
+  - textbox "运行中提示文案":
+    - /placeholder: "Deep diving...\nThinking hard...\nWorking..."
+    - text: Deep diving...

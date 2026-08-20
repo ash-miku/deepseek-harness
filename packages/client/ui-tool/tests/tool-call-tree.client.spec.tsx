@@ -2,6 +2,7 @@
 /** ToolCallTree-owned root/subcall markers and selection projection. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
+import type { HostDescription } from '@deepseek-ai/dsh-client-connection/client'
 import type { ConversationSnapshot, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -21,9 +22,11 @@ const root = (callId: string, call: ToolResultNode['call']): ToolResultNode => (
 function props(
   block: ToolResultNode,
   selectedCallId?: string,
-  displayMode?: 'full' | 'fold' | 'conclusion',
+  displayModeOrDescription?: 'full' | 'fold' | 'conclusion' | HostDescription,
   foldGroup?: { first: boolean; count: number },
 ): ToolTreeProps {
+  const displayMode = typeof displayModeOrDescription === 'string' ? displayModeOrDescription : undefined
+  const description = typeof displayModeOrDescription === 'string' ? undefined : displayModeOrDescription
   const snapshot = {} as ConversationSnapshot
   const useSession = ((selector: (value: ConversationSnapshot) => unknown) => selector(snapshot)) as ToolTreeProps['useSession']
   const renderSlot = ((_key: string, _owner: object, options?: { fallback?: React.ReactNode }) =>
@@ -48,6 +51,7 @@ function props(
     inspectCall: vi.fn(),
     forkAt: vi.fn(),
     fileMentions: vi.fn(),
+    useHostDescription: (selector => selector(description)) as ToolTreeProps['useHostDescription'],
     t,
   } as unknown as ToolTreeProps
 }
@@ -111,5 +115,13 @@ describe('ToolCallTree', () => {
     const secondView = render(<ToolCallTree {...props(second, 'w2', 'fold', { first: false, count: 3 })} />)
     expect(secondView.container.querySelector('[data-fold-process]')).toBeNull()
     expect(secondView.container.querySelector('[data-chat-call-id]')).toBeNull()
+  })
+
+  it('abbreviates a POSIX home path in the generic tool summary', () => {
+    const block = root('w1', { name: 'read', argsRaw: '{"path":"/h/docs/a.ts"}' })
+    const view = render(<ToolCallTree {...props(block, 'w1', {
+      version: '0', cwd: '/tmp', attachedSessions: 0, home: '/h', canOpenPath: false,
+    })} />)
+    expect(view.getByText('~/docs/a.ts')).toBeTruthy()
   })
 })

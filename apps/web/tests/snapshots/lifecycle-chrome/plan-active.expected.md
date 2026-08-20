@@ -10,6 +10,8 @@
 - textbox "Search sessions..."
 - button "View options":
   - img
+- button "Archive inactive sessions":
+  - img
 - button "Add workspace":
   - img
 - tree "Sessions":

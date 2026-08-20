@@ -265,15 +265,24 @@ async function loadedFlowRows(page: Page): Promise<number> {
 async function openSeed(page: Page, fixture: ChatScrollFixture, tailMarker?: string): Promise<void> {
   // Search collapsed into a header action; expand it before filling.
   const searchButton = page.getByRole('button', { name: 'Search sessions' })
-  if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
   const search = page.getByRole('textbox', { name: 'Search sessions...', exact: true })
-  // Cold summaries initially show the temporary workspace basename, so the
-  // persisted first-prompt marker is the stable user-facing identity. The
-  // query itself triggers lazy content-index reconciliation; no transient
-  // empty-state paint is used as a barrier.
-  await search.fill(fixture.markers.user(1))
+  const query = fixture.markers.user(1)
   const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
-  await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
+  const fillSearch = async (): Promise<void> => {
+    const expanded = await searchButton.getAttribute('aria-expanded')
+    if (expanded !== 'true' || await search.count() === 0) await searchButton.click()
+    await search.waitFor({ state: 'visible', timeout: 30_000 })
+    await search.fill(query)
+  }
+  await fillSearch()
+  await expect.poll(async () => {
+    try {
+      if (await search.count() === 0 || await search.inputValue() !== query) await fillSearch()
+      return await results.count()
+    } catch {
+      return 0
+    }
+  }, { timeout: 60_000 }).toBe(1)
   await results.click()
   await page.getByRole('tab', { name: 'Chat', exact: true }).waitFor({ timeout: 30_000 })
   if (tailMarker !== undefined) {
@@ -281,7 +290,6 @@ async function openSeed(page: Page, fixture: ChatScrollFixture, tailMarker?: str
   }
   await nextPaint(page)
 }
-
 async function wheelTranscript(page: Page, deltaY: number): Promise<void> {
   const box = await page.locator('[data-conversation-scroll]').boundingBox()
   if (box === null) throw new Error('conversation scrollport has no layout box')
@@ -659,8 +667,14 @@ describe('web e2e: long Chat scroll contract', () => {
       await world.page.setViewportSize({ width: 700, height: 900 })
       // The narrow breakpoint auto-collapses the sidebar. Re-open it because
       // this scenario switches sessions while pinning the narrow Chat scroll owner.
+      const drawer = world.page.locator('[data-narrow-drawer]')
       await world.page.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+      await expect.poll(() => drawer.count()).toBe(1)
+      await world.page.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
+      await expect.poll(() => drawer.count()).toBe(0)
       await world.page.getByRole('tab', { name: 'Chat', exact: true }).click()
+      await world.page.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+      await expect.poll(() => drawer.count()).toBe(1)
       await nextPaint(world.page)
       await expectSameFlowTop(world.page, sessionAnchor)
 

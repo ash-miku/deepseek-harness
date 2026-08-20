@@ -344,6 +344,12 @@
   pointer-events: none;
 }
 
+/* Spacious desktop columns have enough room for the card itself; cap the glow
+   there so the decorative blur does not extend beyond the conversation surface. */
+@media (min-width: 1600px) {
+  .heroGlow { width: 100%; }
+}
+
 .heroWorkspaceRow {
   display: flex;
   align-items: center;

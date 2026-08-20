@@ -10,6 +10,8 @@
 - textbox "Search sessions..."
 - button "View options":
   - img
+- button "Archive inactive sessions":
+  - img
 - button "Add workspace":
   - img
 - tree "Sessions":
@@ -34,6 +36,7 @@
   - img
 - tooltip "Commands"
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Plan mode off, press to turn on": Plan
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
