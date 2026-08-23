@@ -76,7 +76,7 @@ import {
  * methods take the business payload directly — the carrier mints the rpcId and wraps the
  * envelope. Business code needing the call's rpcId reads it from the RpcResponse echo.
  * Unary methods and respond accept an optional external AbortSignal as the last parameter.
- * Bounded calls merge it with the instance timeout via AbortSignal.any; user-paced calls
+ * Bounded calls merge the instance timeout with the external signal; user-paced calls
  * carry only that external signal. In both cases the signal rides beside the request, never
  * on the wire, like the stream signatures.
  * Stream methods accept an optional onOpen callback: it fires once the physical transport is
@@ -251,6 +251,34 @@ function browserSafeRandomUuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
+/** Combine timeout and caller cancellation on browsers without AbortSignal.any. */
+function combineAbortSignals(signals: readonly AbortSignal[]): AbortSignal {
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([...signals])
+
+  const controller = new AbortController()
+  const listeners: Array<{ signal: AbortSignal; listener: () => void }> = []
+  const cleanup = (): void => {
+    for (const { signal, listener } of listeners) signal.removeEventListener('abort', listener)
+    listeners.length = 0
+  }
+  const abort = (signal: AbortSignal): void => {
+    if (controller.signal.aborted) return
+    cleanup()
+    controller.abort(signal.reason)
+  }
+
+  for (const signal of signals) {
+    if (signal.aborted) {
+      abort(signal)
+      break
+    }
+    const listener = (): void => { abort(signal) }
+    listeners.push({ signal, listener })
+    signal.addEventListener('abort', listener, { once: true })
+  }
+  return controller.signal
+}
+
 /**
  * Abstract fetch-carrier client. Subclasses supply the transport (doFetch) and may refine the
  * per-message tap (onEnvelope) — platform aspects stay in subclasses, protocol invariants stay
@@ -330,7 +358,7 @@ export abstract class AbstractApiClient implements IApiClient {
     const requestSignal = timeoutPolicy === 'default'
       ? signal === undefined
         ? AbortSignal.timeout(this.timeoutMs)
-        : AbortSignal.any([AbortSignal.timeout(this.timeoutMs), signal])
+        : combineAbortSignals([AbortSignal.timeout(this.timeoutMs), signal])
       : signal
     const response = await this.doFetch(new URL(path, this.resolveBase()), {
       method: 'POST',

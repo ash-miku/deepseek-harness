@@ -55,6 +55,38 @@ interface RemoteNamespaceHandle {
 /** Typed Remote service augmented by generated direct namespaces. */
 export type ClientRemote = TypertClientRemote
 
+/**
+ * Combine cancellation signals on browsers that predate `AbortSignal.any`.
+ * The fallback mirrors the native first-abort behavior and removes listeners
+ * once the combined signal settles.
+ */
+function combineAbortSignals(signals: readonly AbortSignal[]): AbortSignal {
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([...signals])
+
+  const controller = new AbortController()
+  const listeners: Array<{ signal: AbortSignal; listener: () => void }> = []
+  const cleanup = (): void => {
+    for (const { signal, listener } of listeners) signal.removeEventListener('abort', listener)
+    listeners.length = 0
+  }
+  const abort = (signal: AbortSignal): void => {
+    if (controller.signal.aborted) return
+    cleanup()
+    controller.abort(signal.reason)
+  }
+
+  for (const signal of signals) {
+    if (signal.aborted) {
+      abort(signal)
+      break
+    }
+    const listener = (): void => { abort(signal) }
+    listeners.push({ signal, listener })
+    signal.addEventListener('abort', listener, { once: true })
+  }
+  return controller.signal
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Generated Remote namespaces selected by the Client assembly. */
@@ -401,7 +433,7 @@ class ClientRemoteService extends Service implements TypertClientRemote {
     const callerSignal = hasCallerSignal ? values[expected] as AbortSignal | undefined : undefined
     const signal = callerSignal === undefined
       ? token.abort.signal
-      : AbortSignal.any([token.abort.signal, callerSignal])
+      : combineAbortSignals([token.abort.signal, callerSignal])
     try {
       const result = await connection.rpc.call('/api', endpoint, { args }, signal)
       if (!mountActive(token)) return withdrawn(endpoint)

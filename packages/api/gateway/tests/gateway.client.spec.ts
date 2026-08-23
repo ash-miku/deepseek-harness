@@ -234,6 +234,44 @@ describe('Client Typert API', () => {
     disposeBusinessProbe()
   })
 
+  it('falls back when AbortSignal.any is unavailable', async () => {
+    const nativeAny = Object.getOwnPropertyDescriptor(AbortSignal, 'any')
+    if (nativeAny === undefined) throw new Error('AbortSignal.any is not defined in the test runtime')
+    Object.defineProperty(AbortSignal, 'any', { configurable: true, value: undefined })
+    try {
+      const call = vi.fn<ConnectionHandle['rpc']['call']>()
+        .mockResolvedValue({ ok: true, value: { ref: 'goal-compat' } })
+      const ctx = await bench(call)
+      const businessProbe = { owner: 'host business service' }
+      const disposeBusinessProbe = ctx.provide('probe', businessProbe)
+      const assembly = ctx.plugin(Object.assign(
+        (scope: Context) => scope.remote.$mount({ package: '@fixture/probe', descriptors: [directDescriptor()] }),
+        { inject: ['remote'] },
+      ))
+      await assembly
+
+      const callerAbort = new AbortController()
+      await expect(ctx.remote.probe.create(
+        'agent-1',
+        { objective: 'compatibility' },
+        callerAbort.signal,
+      )).resolves.toEqual({ ok: true, value: { ref: 'goal-compat' } })
+      const combinedSignal = call.mock.calls.at(-1)?.[3]
+      expect(combinedSignal).toBeInstanceOf(AbortSignal)
+      expect(combinedSignal).not.toBe(callerAbort.signal)
+
+      const cancellation = new Error('caller cancelled')
+      callerAbort.abort(cancellation)
+      expect(combinedSignal?.aborted).toBe(true)
+      expect(combinedSignal?.reason).toBe(cancellation)
+
+      await assembly.dispose()
+      disposeBusinessProbe()
+    } finally {
+      Object.defineProperty(AbortSignal, 'any', nativeAny)
+    }
+  })
+
   it('encodes declared undefined as an omitted argument and distinguishes it from null results', async () => {
     const call = vi.fn<ConnectionHandle['rpc']['call']>()
       .mockResolvedValueOnce({ ok: true, value: undefined })

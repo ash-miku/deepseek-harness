@@ -413,6 +413,45 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     expect((await c.agentPresets.remove({ agentPreset: 'mine' })).result).toEqual({ ok: true, value: {} })
   })
 
+  it('sends prompt requests when AbortSignal.any is unavailable', async () => {
+    const nativeAny = Object.getOwnPropertyDescriptor(AbortSignal, 'any')
+    if (nativeAny === undefined) throw new Error('AbortSignal.any is not defined in the test runtime')
+    Object.defineProperty(AbortSignal, 'any', { configurable: true, value: undefined })
+    try {
+      let requestSignal: AbortSignal | undefined
+      const c = new InProcessApiClient({
+        fetch: async (_input, init) => {
+          requestSignal = init?.signal ?? undefined
+          const body = init?.body
+          if (typeof body !== 'string') throw new Error('expected JSON request body')
+          const request = JSON.parse(body) as { rpcId: string }
+          return Response.json({
+            type: 'server-response',
+            rpcId: request.rpcId,
+            result: { ok: true, value: { accepted: true } },
+          })
+        },
+      })
+      const callerAbort = new AbortController()
+      await expect(c.sessions.prompt({
+        sessionId: 's' as never,
+        mode: 'queue',
+        content: [{ type: 'text', text: 'mobile prompt' }],
+      }, callerAbort.signal)).resolves.toMatchObject({
+        result: { ok: true, value: { accepted: true } },
+      })
+      expect(requestSignal).toBeInstanceOf(AbortSignal)
+      expect(requestSignal).not.toBe(callerAbort.signal)
+
+      const cancellation = new Error('caller cancelled')
+      callerAbort.abort(cancellation)
+      expect(requestSignal?.aborted).toBe(true)
+      expect(requestSignal?.reason).toBe(cancellation)
+    } finally {
+      Object.defineProperty(AbortSignal, 'any', nativeAny)
+    }
+  })
+
   it('round-trips the native picker without the default unary timeout', async () => {
     const api = fakeApi()
     api.host.pickDirectory = async (request) => {
