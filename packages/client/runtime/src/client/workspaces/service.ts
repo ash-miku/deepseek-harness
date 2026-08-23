@@ -363,6 +363,11 @@ export class WorkspaceRuntime implements IWorkspaces {
     this.manager.handleConnected()
   }
 
+  /** Stop a pending Workspace baseline retry when the connection generation dies. */
+  handleDisconnected(): void {
+    this.manager.handleDisconnected()
+  }
+
   private project(): void {
     const workspace = this.manager.getSnapshot()
     const sessions = this.sessions.list.getSnapshot()

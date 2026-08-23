@@ -2,7 +2,7 @@
  * The outward workspaces-service face — what `ctx.workspaces` exposes to
  * feature packages and the renderer host, and therefore exactly what the
  * test runtime's workspaces double must implement. Wire-pump entry points
- * (handleHostEnvelope/handleConnected/refresh/startInitialSelection) stay on
+ * (handleHostEnvelope/handleConnected/handleDisconnected/refresh/startInitialSelection) stay on
  * the concrete class. Widening this interface is the explicit act of
  * widening what features may do to the workspaces domain.
  */

@@ -226,8 +226,13 @@ export function apply(ctx: Context): void {
       // the only safe moment to drop generation-scoped interaction state.
       if (state === 'reconnecting') {
         sessions.handleDisconnected()
+        workspaces.handleDisconnected()
       }
     },
   })
-  ctx.effect(() => () => { loop.stop() }, 'runtime: connection stream loop')
+  ctx.effect(() => () => {
+    sessions.handleDisconnected()
+    workspaces.handleDisconnected()
+    loop.stop()
+  }, 'runtime: connection stream loop')
 }

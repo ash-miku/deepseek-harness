@@ -10,6 +10,7 @@ import type {
 // plugin-to-plugin value imports are a bundle purity error.
 import { transportError } from '@deepseek-ai/dsh-host-apiproxy/api'
 import { mergeOrderedBaseline } from '../ordered-baseline.ts'
+import { baselineRetryDelay } from '../baseline-retry.ts'
 import type { ConversationRuntime } from './conversation-assembler.ts'
 import type { SessionListEntry, TitledSessionSummary } from './lineage.ts'
 import { flattenLineage } from './lineage.ts'
@@ -133,6 +134,9 @@ export class SessionManager {
   private listPhase: SessionListPhase = 'pending'
   private listError: RpcError | null = null
   private listInflight: Promise<void> | null = null
+  private connectionActive = false
+  private listRetryTimer: ReturnType<typeof setTimeout> | null = null
+  private listRetryAttempt = 0
   /** Mutations arriving after a list request starts are replayed over its response. */
   private listMutations: SessionListMutation[] | null = null
   private readonly addresses = new Map<SessionId, SubagentAddress>()
@@ -437,6 +441,7 @@ export class SessionManager {
 
   /** Full refresh via session.list (single-flight: an in-flight call is reused). */
   refreshList(): Promise<void> {
+    this.cancelListRetry()
     if (this.listInflight !== null) return this.listInflight
     this.listState = 'loading'
     this.listError = null
@@ -468,6 +473,7 @@ export class SessionManager {
           this.summaries = summaries
           this.listState = 'idle'
           this.listPhase = 'ready'
+          this.listRetryAttempt = 0
           // Covers the empty-mutations pull (a plain baseline carries no edge).
           this.syncCompletedNotifications()
           // Push running/blank bits down to instantiated Sessions (the list is the authoritative summary source).
@@ -502,10 +508,31 @@ export class SessionManager {
       } finally {
         this.listMutations = null
         this.listInflight = null
+        if (this.listPhase === 'pending' && this.listState === 'error' && this.connectionActive) {
+          this.scheduleListRetry()
+        }
         this.notifier.markDirty()
       }
     })()
     return this.listInflight
+  }
+
+  /** Schedule a retry while the current connection can still serve requests. */
+  private scheduleListRetry(): void {
+    if (this.listRetryTimer !== null || !this.connectionActive) return
+    const delay = baselineRetryDelay(this.listRetryAttempt)
+    this.listRetryAttempt += 1
+    this.listRetryTimer = setTimeout(() => {
+      this.listRetryTimer = null
+      void this.refreshList()
+    }, delay)
+  }
+
+  /** Cancel a pending baseline retry when a pull or connection lifecycle supersedes it. */
+  private cancelListRetry(): void {
+    if (this.listRetryTimer === null) return
+    clearTimeout(this.listRetryTimer)
+    this.listRetryTimer = null
   }
 
   /**
@@ -885,6 +912,8 @@ export class SessionManager {
    * request with its live rpcId.
   */
   handleDisconnected(): void {
+    this.connectionActive = false
+    this.cancelListRetry()
     if (this.pendingInteractions.size > 0) {
       this.pendingInteractions.clear()
       this.notifier.markDirty()
@@ -900,6 +929,9 @@ export class SessionManager {
 
   /** After each connection generation: refresh the session baseline and rebuild opened windows. */
   handleConnected(): void {
+    this.connectionActive = true
+    this.cancelListRetry()
+    this.listRetryAttempt = 0
     void this.refreshList()
     const selectedAddress = this.selected === undefined ? undefined : this.addresses.get(this.selected)
     if (selectedAddress !== undefined) void this.refreshSubagents(selectedAddress.parentSessionId)

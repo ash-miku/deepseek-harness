@@ -59,6 +59,40 @@ describe('WorkspaceManager', () => {
     expect(manager.getSnapshot()).toMatchObject({ phase: 'ready', state: 'error', error: { message: 'wire down' } })
   })
 
+  it('retries a failed initial pull while the connection stays active', async () => {
+    vi.useFakeTimers()
+    let manager: WorkspaceManager | undefined
+    try {
+      const api = new FakeApiClient()
+      let attempts = 0
+      api.onWorkspaceList = () => {
+        attempts += 1
+        return attempts === 1
+          ? Promise.resolve(err({ code: 'internal', message: 'warming up', details: {} }))
+          : Promise.resolve(ok({ items: [workspace('recovered')] as never[] }))
+      }
+      manager = new WorkspaceManager(api)
+      manager.handleConnected()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(api.callsOf('workspace.list')).toHaveLength(1)
+      expect(manager.getSnapshot().phase).toBe('pending')
+
+      await vi.advanceTimersByTimeAsync(250)
+      expect(api.callsOf('workspace.list')).toHaveLength(2)
+      expect(manager.getSnapshot()).toMatchObject({ state: 'idle', phase: 'ready' })
+      expect(manager.getSnapshot().items.map(item => item.workspaceId)).toEqual(['recovered'])
+
+      api.onWorkspaceList = () => Promise.resolve(err({ code: 'internal', message: 'later failure', details: {} }))
+      await manager.refresh()
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(api.callsOf('workspace.list')).toHaveLength(3)
+    } finally {
+      manager?.handleDisconnected()
+      vi.useRealTimers()
+    }
+  })
+
   it('creates by path, prepends a new row, and folds failures', async () => {
     const api = new FakeApiClient()
     const manager = new WorkspaceManager(api)
@@ -576,6 +610,45 @@ describe('startInitialSelection', () => {
     expect(b.api.callsOf('session.create')).toEqual([{ workspaceId: 'recent' }])
     expect(b.sessions.list.getSnapshot().current).toBe('s-new')
     stop()
+  })
+
+  it('recovers both failed baselines before selecting the recent Workspace', async () => {
+    vi.useFakeTimers()
+    const b = bench()
+    const stop = b.workspaces.startInitialSelection()
+    let workspaceAttempts = 0
+    let sessionAttempts = 0
+    try {
+      b.api.onWorkspaceList = () => {
+        workspaceAttempts += 1
+        return workspaceAttempts === 1
+          ? Promise.resolve(err({ code: 'internal', message: 'workspace warming up', details: {} }))
+          : Promise.resolve(ok({ items: [workspace('recent', [], '2026-01-02T00:00:00.000Z')] as never[] }))
+      }
+      b.api.onList = () => {
+        sessionAttempts += 1
+        return sessionAttempts === 1
+          ? Promise.resolve(err({ code: 'internal', message: 'sessions warming up', details: {} }))
+          : Promise.resolve(ok({ items: [] as never[] }))
+      }
+      b.api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-recovered') }))
+      b.workspaces.handleConnected()
+      b.sessions.handleConnected()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(b.api.callsOf('session.create')).toHaveLength(0)
+
+      await vi.advanceTimersByTimeAsync(250)
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(b.api.callsOf('session.create')).toEqual([{ workspaceId: 'recent' }])
+      expect(b.sessions.list.getSnapshot().current).toBe('s-recovered')
+    } finally {
+      stop()
+      b.sessions.handleDisconnected()
+      b.workspaces.handleDisconnected()
+      vi.useRealTimers()
+    }
   })
 
   it('stays idle when a session is already current or no recent Workspace exists', async () => {

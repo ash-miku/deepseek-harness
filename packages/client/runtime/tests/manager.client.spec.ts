@@ -163,6 +163,40 @@ describe('list lifecycle', () => {
     expect(manager.getListSnapshot().phase).toBe('pending')
   })
 
+  it('retries a failed initial pull while the connection stays active', async () => {
+    vi.useFakeTimers()
+    let manager: SessionManager | undefined
+    try {
+      const api = new FakeApiClient()
+      let attempts = 0
+      api.onList = () => {
+        attempts += 1
+        return attempts === 1
+          ? Promise.resolve(err({ code: 'internal', message: 'warming up', details: {} }))
+          : Promise.resolve(ok({ items: [summary(S1)] as never[] }))
+      }
+      manager = new SessionManager(api, fakeRemote())
+      manager.handleConnected()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(api.callsOf('session.list')).toHaveLength(1)
+      expect(manager.getListSnapshot().phase).toBe('pending')
+
+      await vi.advanceTimersByTimeAsync(250)
+      expect(api.callsOf('session.list')).toHaveLength(2)
+      expect(manager.getListSnapshot()).toMatchObject({ state: 'idle', phase: 'ready' })
+      expect(manager.getListSnapshot().items.map(item => item.sessionId)).toEqual([S1])
+
+      api.onList = () => Promise.resolve(err({ code: 'internal', message: 'later failure', details: {} }))
+      await manager.refreshList()
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(api.callsOf('session.list')).toHaveLength(3)
+    } finally {
+      manager?.handleDisconnected()
+      vi.useRealTimers()
+    }
+  })
+
   it('phase steps pending → ready on the first successful pull and never returns', async () => {
     const api = new FakeApiClient()
     const manager = new SessionManager(api, fakeRemote())

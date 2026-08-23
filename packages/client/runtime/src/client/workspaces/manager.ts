@@ -4,6 +4,7 @@ import type {
   HostFrame, IApiClient, RpcError, RpcRequest, RpcResult, SessionId, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import { transportError } from '@deepseek-ai/dsh-host-apiproxy/api'
+import { baselineRetryDelay } from '../baseline-retry.ts'
 import { Notifier } from '../sessions/notifier.ts'
 import { Workspace, type WorkspaceCreateInput } from './workspace.ts'
 
@@ -49,6 +50,9 @@ export class WorkspaceManager {
   private phase: WorkspaceListPhase = 'pending'
   private error: RpcError | null = null
   private inflight: Promise<void> | null = null
+  private connectionActive = false
+  private retryTimer: ReturnType<typeof setTimeout> | null = null
+  private retryAttempt = 0
   private refreshFrames: WorkspaceDelta[] | null = null
   /**
    * True once a frame or unary echo installed the archive set while a list
@@ -91,6 +95,7 @@ export class WorkspaceManager {
    * @returns the shared in-flight refresh.
    */
   refresh(): Promise<void> {
+    this.cancelRetry()
     if (this.inflight !== null) return this.inflight
     this.state = 'loading'
     this.error = null
@@ -109,6 +114,7 @@ export class WorkspaceManager {
           if (!this.favoriteSupersedesRefresh) this.installFavorite(result.value.favoriteSessionIds)
           this.state = 'idle'
           this.phase = 'ready'
+          this.retryAttempt = 0
         } else {
           this.state = 'error'
           this.error = result.error
@@ -123,10 +129,31 @@ export class WorkspaceManager {
         this.archivedSupersedesRefresh = false
         this.favoriteSupersedesRefresh = false
         this.inflight = null
+        if (this.phase === 'pending' && this.state === 'error' && this.connectionActive) {
+          this.scheduleRetry()
+        }
         this.notifier.markDirty()
       }
     })()
     return this.inflight
+  }
+
+  /** Schedule a retry while the current connection can still serve requests. */
+  private scheduleRetry(): void {
+    if (this.retryTimer !== null || !this.connectionActive) return
+    const delay = baselineRetryDelay(this.retryAttempt)
+    this.retryAttempt += 1
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null
+      void this.refresh()
+    }, delay)
+  }
+
+  /** Cancel a pending baseline retry when a pull or connection lifecycle supersedes it. */
+  private cancelRetry(): void {
+    if (this.retryTimer === null) return
+    clearTimeout(this.retryTimer)
+    this.retryTimer = null
   }
 
   /**
@@ -296,8 +323,17 @@ export class WorkspaceManager {
     }
   }
 
+  /** Stop a pending baseline retry when the connection generation dies. */
+  handleDisconnected(): void {
+    this.connectionActive = false
+    this.cancelRetry()
+  }
+
   /** Re-pull the baseline after each connection generation. */
   handleConnected(): void {
+    this.connectionActive = true
+    this.cancelRetry()
+    this.retryAttempt = 0
     void this.refresh()
   }
 
