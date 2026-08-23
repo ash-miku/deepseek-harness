@@ -1079,7 +1079,7 @@ function projectionValuesOf(log: readonly SessionEvent[]): Record<string, unknow
   // Always present (session-stats unit composed): whole-log turn/step counts.
   values['sessionStats'] = sessionStatsOf(log)
   // Always present (attachment service composed): the deployment image
-  // limits, constant per boot (mirrors the attachment-local defaults).
+  // limits, constant per boot (mirrors the assembled Web composition).
   // Deliberate host divergence: the real gateway never pushes an imageLimits
   // change frame (constant unit), but the fixture's uniform baseline replay
   // frames every key here, incidentally exercising higher-seq-wins.
@@ -1088,7 +1088,7 @@ function projectionValuesOf(log: readonly SessionEvent[]): Record<string, unknow
     maxImagesPerMessage: 20,
     maxMessageImageBytes: 100 * 1024 * 1024,
     maxImagePixels: 40_000_000,
-    maxImageDimension: 2000,
+    maxImageDimension: 4096,
     mediaTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
   }
   return values

@@ -13,6 +13,14 @@
 
 # ── surface-specific values the base deliberately omits ─────────────────────
 
+# Web deployments commonly use image-capable routes that accept 2K desktop
+# captures. Keep the conservative package default for other compositions; this
+# override leaves byte and decoded-pixel admission limits unchanged. A profile
+# using a stricter route can lower the value in its own patch.
+- id: attachment-local
+  config:
+    maxImageDimension: 4096
+
 - id: system-prompt
   config:
     persona: >-
