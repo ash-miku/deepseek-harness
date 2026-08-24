@@ -31,6 +31,11 @@ import { DisplayModeRow } from './settings/DisplayModeRow.tsx'
 import type { DisplayModeRowInjected } from './settings/DisplayModeRow.tsx'
 import { RunningLabelRow } from './settings/RunningLabelRow.tsx'
 import type { RunningLabelRowInjected } from './settings/RunningLabelRow.tsx'
+import { CompletionSoundController, CompletionSoundPreference } from './completion-sound.ts'
+import { CompletionSoundRow } from './settings/CompletionSoundRow.tsx'
+import type { CompletionSoundRowInjected } from './settings/CompletionSoundRow.tsx'
+import { CompletionSoundVolumeRow } from './settings/CompletionSoundVolumeRow.tsx'
+import type { CompletionSoundVolumeRowInjected } from './settings/CompletionSoundVolumeRow.tsx'
 import { ConversationDisplayPreference } from './display-preference.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { StatsLine } from './chat/StatsLine.tsx'
@@ -140,6 +145,18 @@ export function apply(ctx: Context): void {
   })
   const submissionPolicy = new ComposerSubmissionPolicy(conversationSettings)
   const displayPreference = new ConversationDisplayPreference(conversationSettings)
+  const completionSoundPreference = new CompletionSoundPreference(conversationSettings)
+  const completionSound = new CompletionSoundController(
+    completionSoundPreference.enabled, completionSoundPreference.tone, completionSoundPreference.volume,
+  )
+  ctx.effect(() => {
+    const disposeCompleted = ctx.on('session/completed', () => { completionSound.notifyCompleted() })
+    const disposeSound = completionSound.start()
+    return () => {
+      disposeCompleted()
+      disposeSound()
+    }
+  }, 'ui-conversation: completion sound')
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -173,6 +190,32 @@ export function apply(ctx: Context): void {
       setRunningLabels: (labels) => { displayPreference.setRunningLabels(labels) },
     }),
   }, RunningLabelRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'conversation-completion-sound',
+    order: 40,
+    locale: NS,
+    inject: (): CompletionSoundRowInjected => ({
+      hooks: {
+        completionSound: completionSoundPreference.enabled,
+        completionSoundTone: completionSoundPreference.tone,
+      },
+      setCompletionSoundSelection: (selection) => { completionSoundPreference.setSelection(selection) },
+      previewCompletionSound: () => { completionSound.preview() },
+    }),
+  }, CompletionSoundRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'conversation-completion-sound-volume',
+    order: 50,
+    locale: NS,
+    inject: (): CompletionSoundVolumeRowInjected => ({
+      hooks: { completionSoundVolume: completionSoundPreference.volume },
+      setCompletionSoundVolume: (volume) => { completionSoundPreference.setVolume(volume) },
+    }),
+  }, CompletionSoundVolumeRow))
 
   // Chat semantic reader positions by session, surviving view switches and
   // width reflow when the tab ring remounts the view. Deliberately not

@@ -56,3 +56,11 @@
   - textbox "运行中提示文案":
     - /placeholder: "Deep diving...\nThinking hard...\nWorking..."
     - text: Deep diving...
+  - text: 任务完成提示音 选择任务结束时播放的提示音
+  - button "叮咚":
+    - text: 叮咚
+    - img
+  - button "试听"
+  - text: 提示音音量 仅影响应用内提示音，系统音量仍然有效
+  - slider "提示音音量": "80"
+  - text: 80%

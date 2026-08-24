@@ -165,6 +165,8 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'connection/reset'(): void
+    /** A durable turn ended with the Host's successful completed reason. */
+    'session/completed'(sessionId: SessionId, seq: number): void
   }
   interface Context {
     slots: import('./slots.ts').SlotRegistry

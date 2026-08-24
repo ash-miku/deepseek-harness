@@ -9,8 +9,10 @@
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '../src/client/index.ts'
 import { SessionCreateError, SessionRuntime, scopeOf } from '../src/client/sessions/service.ts'
 import { FakeApiClient, deferred, err, fakeRemote, ok } from './fake-api.client.ts'
+import { ev } from './event-script.client.ts'
 
 const sid = (s: string): SessionId => s as SessionId
 
@@ -93,6 +95,18 @@ describe('list store projection', () => {
     b.svc.handleHostEnvelope({ rpcId: 'r1' as never, payload: { type: 'host/session-added', blank: true, sessionId: sid('s2') } as never })
     await Promise.resolve()
     expect(b.svc.list.getSnapshot().ids).toContain('s2')
+  })
+
+  it('emits only deduplicated successful completed-turn events', () => {
+    const b = bench()
+    const completed = vi.fn()
+    b.ctx.on('session/completed', completed)
+    const success = ev.turnEnd(7, 1)
+    b.svc.handleMuxEnvelope({ rpcId: 'success' as never, payload: { type: 'session/event', sessionId: sid('s1'), event: success } })
+    b.svc.handleMuxEnvelope({ rpcId: 'replay' as never, payload: { type: 'session/event', sessionId: sid('s1'), event: success } })
+    b.svc.handleMuxEnvelope({ rpcId: 'aborted' as never, payload: { type: 'session/event', sessionId: sid('s1'), event: ev.turnEnd(8, 2, 'aborted') } })
+    expect(completed).toHaveBeenCalledOnce()
+    expect(completed).toHaveBeenCalledWith(sid('s1'), 7)
   })
 })
 

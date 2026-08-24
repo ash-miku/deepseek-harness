@@ -268,6 +268,8 @@ export class SessionRuntime implements ISessions {
   private watched: SessionId | undefined
   /** Removed-while-staged sessions whose teardown waits for the stage to move away. */
   private readonly deferredRemovals = new Set<SessionId>()
+  /** Last completed turn/end seq emitted per session, preventing reconnect replay tones. */
+  private readonly completedEventSeq = new Map<SessionId, number>()
 
   /**
    * @param ctx - client root context (scope fibers mount under it).
@@ -451,6 +453,14 @@ export class SessionRuntime implements ISessions {
    */
   handleMuxEnvelope(envelope: Parameters<SessionManager['handleMuxEnvelope']>[0]): void {
     this.manager.handleMuxEnvelope(envelope)
+    const frame = envelope.payload
+    if (frame.type !== 'session/event'
+      || frame.event.type !== 'turn/end'
+      || frame.event.data.reason.kind !== 'completed') return
+    const previous = this.completedEventSeq.get(frame.sessionId)
+    if (previous !== undefined && frame.event.seq <= previous) return
+    this.completedEventSeq.set(frame.sessionId, frame.event.seq)
+    this.rootCtx.emit('session/completed', frame.sessionId, frame.event.seq)
   }
 
   /**
@@ -713,6 +723,10 @@ export class SessionRuntime implements ISessions {
         if (parent !== undefined && parent.origin !== 'subagent') break
         address = this.manager.navigationAddress(address.parentSessionId)
       }
+    }
+    // Keep reconnect dedupe state bounded to sessions still represented by the list.
+    for (const sessionId of this.completedEventSeq.keys()) {
+      if (byId[sessionId] === undefined) this.completedEventSeq.delete(sessionId)
     }
     const persisted = this.selection.getSnapshot().sessionId
     // No current (cleared, or masked gap) wipes the persisted cell — a reload

@@ -56,3 +56,11 @@
   - textbox "Running label":
     - /placeholder: "Deep diving...\nThinking hard...\nWorking..."
     - text: Deep diving...
+  - text: Completion sound Choose the sound played after a task completes
+  - button "Ding-dong":
+    - text: Ding-dong
+    - img
+  - button "Preview"
+  - text: Completion sound volume Controls the app sound; system volume still applies
+  - slider "Completion sound volume": "80"
+  - text: 80%

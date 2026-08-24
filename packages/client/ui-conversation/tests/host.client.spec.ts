@@ -2,8 +2,9 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { SettingsProvider, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
-  CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR, DEFAULT_PROCESS_DISPLAY_MODE,
-  DEFAULT_RUNNING_LABELS, apply,
+  COMPLETION_SOUND_FIELD, CONVERSATION_SETTINGS_NAMESPACE, DEFAULT_BUSY_ENTER_BEHAVIOR,
+  DEFAULT_COMPLETION_SOUND, DEFAULT_COMPLETION_SOUND_TONE, DEFAULT_COMPLETION_SOUND_VOLUME,
+  DEFAULT_PROCESS_DISPLAY_MODE, DEFAULT_RUNNING_LABELS, apply,
 } from '@deepseek-ai/dsh-client-ui-conversation'
 
 class MemorySettings extends SettingsProvider {
@@ -25,17 +26,29 @@ describe('ui-conversation host', () => {
       busyEnter: DEFAULT_BUSY_ENTER_BEHAVIOR,
       processDisplay: DEFAULT_PROCESS_DISPLAY_MODE,
       runningLabels: DEFAULT_RUNNING_LABELS,
+      completionSound: DEFAULT_COMPLETION_SOUND,
+      completionSoundTone: DEFAULT_COMPLETION_SOUND_TONE,
+      completionSoundVolume: DEFAULT_COMPLETION_SOUND_VOLUME,
     })
     await ctx.settings.update(ns, { busyEnter: 'steer' })
     expect(ctx.settings.get(ns)).toEqual({
       busyEnter: 'steer',
       processDisplay: DEFAULT_PROCESS_DISPLAY_MODE,
       runningLabels: DEFAULT_RUNNING_LABELS,
+      completionSound: DEFAULT_COMPLETION_SOUND,
+      completionSoundTone: DEFAULT_COMPLETION_SOUND_TONE,
+      completionSoundVolume: DEFAULT_COMPLETION_SOUND_VOLUME,
     })
     await ctx.settings.update(ns, { processDisplay: 'conclusion' })
-    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', processDisplay: 'conclusion', runningLabels: DEFAULT_RUNNING_LABELS })
+    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', processDisplay: 'conclusion', runningLabels: DEFAULT_RUNNING_LABELS, completionSound: DEFAULT_COMPLETION_SOUND, completionSoundTone: DEFAULT_COMPLETION_SOUND_TONE, completionSoundVolume: DEFAULT_COMPLETION_SOUND_VOLUME })
+    await ctx.settings.update(ns, { [COMPLETION_SOUND_FIELD]: false })
+    await ctx.settings.update(ns, { completionSoundTone: 'bell', completionSoundVolume: 55 })
+    expect(ctx.settings.get(ns)).toEqual({ busyEnter: 'steer', processDisplay: 'conclusion', runningLabels: DEFAULT_RUNNING_LABELS, completionSound: false, completionSoundTone: 'bell', completionSoundVolume: 55 })
     await expect(ctx.settings.update(ns, { busyEnter: 'invalid' })).rejects.toThrow()
     await expect(ctx.settings.update(ns, { processDisplay: 'invalid' })).rejects.toThrow()
+    await expect(ctx.settings.update(ns, { [COMPLETION_SOUND_FIELD]: 'invalid' })).rejects.toThrow()
+    await expect(ctx.settings.update(ns, { completionSoundTone: 'invalid' })).rejects.toThrow()
+    await expect(ctx.settings.update(ns, { completionSoundVolume: 101 })).rejects.toThrow()
     await fiber.dispose()
     expect(ctx.settings.describe().map(row => row.ns)).not.toContain(ns)
   })

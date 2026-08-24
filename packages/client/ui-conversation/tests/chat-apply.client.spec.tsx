@@ -94,7 +94,7 @@ describe('apply wiring', () => {
     expect(b.slots.spec('conversation.hero.brand.mark')).toEqual({ kind: 'single', scope: 'root' })
     expect(b.slots.spec('conversation.hero.workspace')).toEqual({ kind: 'single', scope: 'root' })
     expect(b.slots.spec('conversation.hero.agentPreset')).toEqual({ kind: 'single', scope: 'root' })
-    expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['conversation-display', 'composer-enter', 'conversation-running-label'])
+    expect(b.slots.entries('settings.general.item').map(entry => entry.options.id)).toEqual(['conversation-display', 'composer-enter', 'conversation-running-label', 'conversation-completion-sound', 'conversation-completion-sound-volume'])
     await b.runtime.dispose()
   })
 
