@@ -118,6 +118,8 @@ async function bench() {
         update: (payload: { patch: unknown }) => { calls.push(`settings:${JSON.stringify(payload.patch)}`); return Promise.resolve({ rpcId: 'r', result: { ok: true as const, value: {} } }) },
       },
     },
+    isLoopback: false,
+    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
   } as never)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry, calls, moveDefault }

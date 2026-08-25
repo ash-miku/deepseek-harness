@@ -58,7 +58,11 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
     describe.mockRejectedValue(new Error('transport failure for /api/settings.describe: HTTP 403'))
   }
   const settingsFace = settings ?? { describe, mutate }
-  ctx.provide('connection', { api: { ...services, settings: settingsFace }, isLoopback } as never)
+  ctx.provide('connection', {
+    api: { ...services, settings: settingsFace },
+    isLoopback,
+    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+  } as never)
   // The settings transport and the forwarded-event port the plugin injects.
   new TestRemote(ctx)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()

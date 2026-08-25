@@ -58,6 +58,8 @@ async function bench() {
         mutate: () => Promise.reject(new Error('settings mutation is not exercised')),
       },
     },
+    isLoopback: false,
+    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
   } as never)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
   let decoration: CommandDecoration | undefined

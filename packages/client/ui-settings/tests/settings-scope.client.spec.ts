@@ -325,6 +325,7 @@ describe('SettingsScopeController', () => {
     }
     const mirror = {
       getSnapshot: () => snapshot,
+      isMemory: () => false,
       subscribe: (listener: () => void) => {
         notify = listener
         return () => {}
