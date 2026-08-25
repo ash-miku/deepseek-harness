@@ -2354,6 +2354,24 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'resolution after durability.',
       },
       {
+        signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
+        description: 'Restore one session to grouping surfaces by removing it from the registry-global archive set durably. The session log and workspace accounting slot are untouched. An id outside the set is an idempotent no-op.',
+        parameters: [{ name: 'sessionId', description: 'The session to restore.' }],
+        returns: 'resolution after durability.',
+      },
+      {
+        signature: 'favoriteSession(sessionId: SessionId): Promise<void>',
+        description: 'Favorite (pin) a session durably. The session must exist (live or in session persistence); its workspace accounting is irrelevant. An already favorited id resolves without writing.',
+        parameters: [{ name: 'sessionId', description: 'The session to favorite.' }],
+        returns: 'resolution after durability.',
+      },
+      {
+        signature: 'unfavoriteSession(sessionId: SessionId): Promise<void>',
+        description: 'Unfavorite (unpin) a session by removing it from the durable favorite set. The session log and workspace accounting slot are untouched. An id outside the set is an idempotent no-op.',
+        parameters: [{ name: 'sessionId', description: 'The session to unfavorite.' }],
+        returns: 'resolution after durability.',
+      },
+      {
         signature: 'async resolveByPath(path: string): Promise<Workspace | undefined>',
         description: 'Resolve by canonical directory path without creating or mutating a workspace. A missing path rejects during `realpath`; an existing unowned directory returns `undefined`.',
         parameters: [{ name: 'path', description: 'Existing directory path in any spelling.' }],

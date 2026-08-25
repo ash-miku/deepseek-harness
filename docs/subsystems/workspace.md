@@ -213,6 +213,34 @@ insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly Workspac
 archiveSession(sessionId: SessionId): Promise<void>
 
 /**
+ * Restore one session to grouping surfaces by removing it from the
+ * registry-global archive set durably. The session log and workspace
+ * accounting slot are untouched. An id outside the set is an idempotent
+ * no-op.
+ * @param sessionId - The session to restore.
+ * @returns resolution after durability.
+ */
+unarchiveSession(sessionId: SessionId): Promise<void>
+
+/**
+ * Favorite (pin) a session durably. The session must exist (live or in
+ * session persistence); its workspace accounting is irrelevant.
+ * An already favorited id resolves without writing.
+ * @param sessionId - The session to favorite.
+ * @returns resolution after durability.
+ */
+favoriteSession(sessionId: SessionId): Promise<void>
+
+/**
+ * Unfavorite (unpin) a session by removing it from the durable favorite
+ * set. The session log and workspace accounting slot are untouched.
+ * An id outside the set is an idempotent no-op.
+ * @param sessionId - The session to unfavorite.
+ * @returns resolution after durability.
+ */
+unfavoriteSession(sessionId: SessionId): Promise<void>
+
+/**
  * Resolve by canonical directory path without creating or mutating a
  * workspace. A missing path rejects during `realpath`; an existing unowned
  * directory returns `undefined`.
