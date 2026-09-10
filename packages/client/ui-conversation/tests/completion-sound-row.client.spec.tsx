@@ -2,7 +2,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
-import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { CompletionSoundPreference } from '../src/client/completion-sound.ts'
 import { CompletionSoundRow } from '../src/client/settings/CompletionSoundRow.tsx'
 import type { CompletionSoundRowProps } from '../src/client/settings/CompletionSoundRow.tsx'
@@ -27,18 +31,27 @@ function emptySessions() {
 }
 
 function emptyWorkspaces() {
-  return bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({
-    items: [], archivedSessionIds: [], favoriteSessionIds: [], state: 'idle', phase: 'ready',
-    error: null, baselinesReady: true, recentWorkspaceId: undefined,
+  return bindSnapshotSelector(createSnapshotStore<WorkspaceSnapshot>({
+    items: [], archivedSessionIds: [], favoriteSessionIds: [], state: 'idle', phase: 'ready', error: null,
   }))
 }
+
+function noPendingInteraction() {
+  return bindSnapshotSelector(createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()))
+}
+
+// The resource hook the resources plugin merges into GlobalStandardProps; this row reads no address.
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 function mount() {
   const preference = new CompletionSoundPreference()
   const preview = vi.fn()
   const props: CompletionSoundRowProps = {
+    usePanelInfo: selector => selector({ activePanelId: null }),
     useSessions: emptySessions(),
+    useSessionPendingInteraction: noPendingInteraction(),
     useWorkspaces: emptyWorkspaces(),
+    useResource,
     useCompletionSound: bindSnapshotSelector(preference.enabled),
     useCompletionSoundTone: bindSnapshotSelector(preference.tone),
     setCompletionSoundSelection: (value) => { preference.setSelection(value) },
@@ -52,8 +65,11 @@ function mount() {
 function mountVolume() {
   const preference = new CompletionSoundPreference()
   const props: CompletionSoundVolumeRowProps = {
+    usePanelInfo: selector => selector({ activePanelId: null }),
     useSessions: emptySessions(),
+    useSessionPendingInteraction: noPendingInteraction(),
     useWorkspaces: emptyWorkspaces(),
+    useResource,
     useCompletionSoundVolume: bindSnapshotSelector(preference.volume),
     setCompletionSoundVolume: (value) => { preference.setVolume(value) },
     t: makeTranslate(en),
@@ -100,7 +116,6 @@ describe('CompletionSoundPreference settings compatibility', () => {
       status: 'ready',
       value: {
         busyEnter: 'queue',
-        processDisplay: 'full',
         runningLabels: DEFAULT_RUNNING_LABELS,
         completionSound: DEFAULT_COMPLETION_SOUND,
         completionSoundTone: DEFAULT_COMPLETION_SOUND_TONE,

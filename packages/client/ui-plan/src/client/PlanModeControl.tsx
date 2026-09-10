@@ -74,20 +74,12 @@ export function PlanChip({ useProjection, locked, setPlanMode, t }: PlanChipProp
         disabled={locked || busy}
         onClick={toggle}
       >
-        {/* Design literal, not copy: the chip wordmark stays 'Plan' in every locale. */}
-        <span className={css.label}>Plan</span>
-        {target && (
-          <span className={css.close} aria-hidden>
-            <IconCloseFill14 size={12} />
-          </span>
-        )}
-      </button>
-      {/* Failure copy stays English (error-surface policy: not localized). */}
-      {error !== null && (
-        <span className={css.error} role="status" title={error}>
-          {target ? 'failed to exit plan mode' : 'failed to enter plan mode'}
+        {t('chip.label')}
+        <span className={css.close} aria-hidden>
+          <IconCloseFill14 size={12} />
         </span>
-      )}
+      </button>
+      {error !== null && <span className={css.error} role="status" title={error}>{t('chip.exitFailed')}</span>}
     </span>
   )
 }

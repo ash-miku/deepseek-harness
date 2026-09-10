@@ -1,14 +1,19 @@
 // @vitest-environment jsdom
-/** AppearanceRow behavior: theme cubes plus font-scale chips follow the
- * persisted store snapshot, clicks drive the injected face. */
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { AppearanceRow } from '../src/client/AppearanceRow.tsx'
 import type { AppearanceRowComponentProps } from '../src/client/AppearanceRow.tsx'
 import { createAppearanceRowStore } from '../src/client/settings-store.ts'
-import type { FontScalePreference, ThemePreference } from '../src/client/index.ts'
+import type { ThemePreference } from '../src/client/index.ts'
+
+// Every fixture carries the resource hook the resources plugin merges into GlobalStandardProps.
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined, reload: () => {} })) as GlobalStandardProps['useResource']
+const usePanelInfo: GlobalStandardProps['usePanelInfo'] = selector => selector({ activePanelId: null })
 
 afterEach(cleanup)
 
@@ -17,51 +22,48 @@ const COPY: Record<string, string> = {
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
   'appearance.system': 'System',
-  'fontSize.title': 'Font size',
-  'fontSize.small': 'Small',
-  'fontSize.normal': 'Normal',
-  'fontSize.large': 'Large',
-  'fontSize.xlarge': 'Extra large',
 }
 
-/** Empty global standard-kit hooks (the row reads neither). */
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
     { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
   return bindSnapshotSelector(store)
 }
 function emptyWorkspaces() {
-  const store = createSnapshotStore<WorkspaceListState>({
+  const store = createSnapshotStore<WorkspaceSnapshot>({
     items: [], archivedSessionIds: [], favoriteSessionIds: [], state: 'idle', phase: 'ready', error: null,
-    baselinesReady: true, recentWorkspaceId: undefined,
   })
   return bindSnapshotSelector(store)
 }
 
-function mount(preference: ThemePreference = 'system', fontScale: FontScalePreference = 'normal') {
+type AttentionSnapshot = Parameters<Parameters<AppearanceRowComponentProps['useSessionPendingInteraction']>[0]>[0]
+const noAttention: AttentionSnapshot = new Map()
+const useSessionPendingInteraction: AppearanceRowComponentProps['useSessionPendingInteraction'] = selector => selector(noAttention)
+
+function mount(preference: ThemePreference = 'system') {
   // Real store instance — the sanctioned zero-machinery path for tests.
   const store = createAppearanceRowStore().create()
-  store.actions.sync(preference, fontScale, 0)
+  store.actions.sync(preference, 0)
   const setTheme = vi.fn()
-  const setFontScale = vi.fn()
   const props: AppearanceRowComponentProps = {
     useSessions: emptySessions(),
+    useSessionPendingInteraction,
+    usePanelInfo, useResource,
     useWorkspaces: emptyWorkspaces(),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
     t: (key: string) => COPY[key] ?? key,
     setTheme,
-    setFontScale,
   }
   render(<AppearanceRow {...props} />)
-  return { store, setTheme, setFontScale }
+  return { store, setTheme }
 }
 
 const pressed = (name: RegExp): string | null =>
   screen.getByRole('button', { name }).getAttribute('aria-pressed')
 
 describe('AppearanceRow', () => {
-  it('renders the theme title and three cubes with the preference cube selected', () => {
+  it('renders the title and three cubes with the preference cube selected', () => {
     mount('dark')
     expect(screen.getByText('Appearance')).toBeDefined()
     expect(pressed(/Dark/)).toBe('true')
@@ -75,20 +77,8 @@ describe('AppearanceRow', () => {
     expect(b.setTheme).toHaveBeenCalledWith('light')
     // No store write yet: selection is unchanged.
     expect(pressed(/Dark/)).toBe('true')
-    act(() => { b.store.actions.sync('light', 'normal', 1) })
+    act(() => { b.store.actions.sync('light', 1) })
     expect(pressed(/Light/)).toBe('true')
     expect(pressed(/Dark/)).toBe('false')
-  })
-
-  it('renders the font size row and click drives setFontScale', () => {
-    const b = mount('system', 'normal')
-    expect(screen.getByText('Font size')).toBeDefined()
-    expect(pressed(/Normal/)).toBe('true')
-    fireEvent.click(screen.getByRole('button', { name: /Large/ }))
-    expect(b.setFontScale).toHaveBeenCalledWith('large')
-    // No store write yet: selection is unchanged.
-    expect(pressed(/Normal/)).toBe('true')
-    act(() => { b.store.actions.sync('system', 'large', 1) })
-    expect(pressed(/Large/)).toBe('true')
   })
 })

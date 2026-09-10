@@ -2,7 +2,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
-import { createSnapshotStore, type SessionListState, type WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import { ConversationDisplayPreference } from '../src/client/display-preference.ts'
 import { RunningLabelRow } from '../src/client/settings/RunningLabelRow.tsx'
@@ -23,18 +27,27 @@ function emptySessions() {
 }
 
 function emptyWorkspaces() {
-  return bindSnapshotSelector(createSnapshotStore<WorkspaceListState>({
+  return bindSnapshotSelector(createSnapshotStore<WorkspaceSnapshot>({
     items: [], archivedSessionIds: [], favoriteSessionIds: [], state: 'idle', phase: 'ready', error: null,
-    baselinesReady: true, recentWorkspaceId: undefined,
   }))
 }
+
+function noPendingInteraction() {
+  return bindSnapshotSelector(createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()))
+}
+
+// The resource hook the resources plugin merges into GlobalStandardProps; this row reads no address.
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 function mount() {
   const preference = new ConversationDisplayPreference()
   const setRunningLabels = vi.fn((labels: string) => { preference.setRunningLabels(labels) })
   const props: RunningLabelRowProps = {
+    usePanelInfo: selector => selector({ activePanelId: null }),
     useSessions: emptySessions(),
+    useSessionPendingInteraction: noPendingInteraction(),
     useWorkspaces: emptyWorkspaces(),
+    useResource,
     useRunningLabels: bindSnapshotSelector(preference.runningLabels),
     setRunningLabels,
     t: makeTranslate(en),
@@ -59,8 +72,11 @@ describe('RunningLabelRow', () => {
     const host = stubSettingsScope<ConversationSettings>()
     const preference = new ConversationDisplayPreference(host.scope)
     const props: RunningLabelRowProps = {
+      usePanelInfo: selector => selector({ activePanelId: null }),
       useSessions: emptySessions(),
+      useSessionPendingInteraction: noPendingInteraction(),
       useWorkspaces: emptyWorkspaces(),
+      useResource,
       useRunningLabels: bindSnapshotSelector(preference.runningLabels),
       setRunningLabels: (labels) => { preference.setRunningLabels(labels) },
       t: makeTranslate(en),

@@ -21,10 +21,10 @@ describe('ui-theme client styles', () => {
     const styles = [...document.head.querySelectorAll<HTMLStyleElement>(`style[data-plugin="${PLUGIN_ID}"]`)]
     expect(styles.map(style => style.dataset.pluginCss)).toEqual([
       `${PLUGIN_ID}/base.css`,
+      `${PLUGIN_ID}/corner-shape.css`,
       `${PLUGIN_ID}/design-platform.css`,
       `${PLUGIN_ID}/scrollbar.css`,
       `${PLUGIN_ID}/gradient-shadow-text.css`,
-      `${PLUGIN_ID}/font-scale.css`,
       `${PLUGIN_ID}/shiki.css`,
     ])
     await fiber.dispose()

@@ -8,11 +8,10 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { PlanProjection } from '@deepseek-ai/dsh-plan-mode/client'
 import { PlanChip, type PlanChipProps } from '../src/client/PlanModeControl.tsx'
-import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { zh } from '../src/client/locales.ts'
 
@@ -131,7 +130,7 @@ describe('PlanChip', () => {
       .mockRejectedValueOnce('socket closed')
     setup({ active: true, pending: false }, setPlanMode)
     fireEvent.click(activeChip())
-    expect((await screen.findByText('failed to exit plan mode')).getAttribute('title')).toBe('host said no')
+    expect((await screen.findByText('退出 plan mode 失败')).getAttribute('title')).toBe('host said no')
     expect(activeChip()).toBeTruthy()
 
     fireEvent.click(activeChip())
@@ -145,7 +144,9 @@ describe('PlanChip', () => {
     const setPlanMode = vi.fn(() => Promise.resolve('host said no'))
     setup({ active: false, pending: false }, setPlanMode)
     fireEvent.click(inactiveChip())
-    expect(await screen.findByText('failed to enter plan mode')).toBeTruthy()
+    // Both directions render the same localized failure copy (the store's own
+    // message rides the title attribute, asserted above).
+    expect(await screen.findByText('退出 plan mode 失败')).toBeTruthy()
     expect(inactiveChip()).toBeTruthy()
   })
 

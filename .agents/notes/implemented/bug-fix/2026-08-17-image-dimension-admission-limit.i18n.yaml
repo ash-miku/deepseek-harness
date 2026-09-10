@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-17-image-dimension-admission-limit.md
-2026-08-17-image-dimension-admission-limit.md: f144007903161cc067543d82b99166b1d5ebe7fb
-2026-08-17-image-dimension-admission-limit.zh.md: 86aec10505cb5905a7ffc30b8246373b8e55794d
+2026-08-17-image-dimension-admission-limit.md: d63a90a7ad590bae45934d57626fd55fdbecaff9
+2026-08-17-image-dimension-admission-limit.zh.md: 15297b9cfe11df47a4783b4c1d5ad15b3a47b8d1

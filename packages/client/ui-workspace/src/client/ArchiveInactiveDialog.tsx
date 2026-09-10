@@ -8,10 +8,10 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   Button, IconChevronDownOutline14, Menu, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceBrowserProps } from './contract/slots.ts'
 import { INACTIVE_ARCHIVE_THRESHOLDS_DAYS, selectInactiveSessions } from './archive-inactive.ts'
-import css from './WorkspaceBrowser.module.css'
+import css from './rows/WorkspaceBrowser.module.css'
 
 /** Default inactivity threshold when the dialog opens. */
 const DEFAULT_ARCHIVE_DAYS = 30
@@ -20,20 +20,25 @@ const DEFAULT_ARCHIVE_DAYS = 30
  * @param props.open - whether the modal is visible.
  * @param props.onClose - dismiss the modal; ignored while archiving.
  * @param props.useSessions - the standard session list hook.
+ * @param props.useSessionPendingInteraction - the Session-owned pending-interaction hook.
  * @param props.archivedSessionIds - registry-global archive set.
  * @param props.archiveSession - one-session archive action.
  * @param props.t - workspace locale seat.
  * @returns the modal tree.
  */
-export function ArchiveInactiveDialog({ open, onClose, useSessions, archivedSessionIds, archiveSession, t }: {
+export function ArchiveInactiveDialog({
+  open, onClose, useSessions, useSessionPendingInteraction, archivedSessionIds, archiveSession, t,
+}: {
   open: boolean
   onClose: () => void
   useSessions: WorkspaceBrowserProps['useSessions']
+  useSessionPendingInteraction: WorkspaceBrowserProps['useSessionPendingInteraction']
   archivedSessionIds: readonly SessionId[]
   archiveSession: WorkspaceBrowserProps['archiveSession']
   t: WorkspaceBrowserProps['t']
 }) {
   const list = useSessions(state => state)
+  const pendingInteractions = useSessionPendingInteraction(state => state)
   const [days, setDays] = useState(DEFAULT_ARCHIVE_DAYS)
   const [busy, setBusy] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -44,9 +49,13 @@ export function ArchiveInactiveDialog({ open, onClose, useSessions, archivedSess
     setBusy(false)
     setResult(null)
   }, [open])
+  const pendingSessionIds = useMemo(
+    () => [...pendingInteractions.keys()],
+    [pendingInteractions],
+  )
   const candidates = useMemo(
-    () => selectInactiveSessions(list, archivedSessionIds, Date.now(), days),
-    [archivedSessionIds, days, list],
+    () => selectInactiveSessions(list, archivedSessionIds, pendingSessionIds, Date.now(), days),
+    [archivedSessionIds, days, list, pendingSessionIds],
   )
   const close = () => {
     /* v8 ignore next 3 -- Modal close and cancel are disabled while busy, so this guard only covers an external imperative close. */

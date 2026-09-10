@@ -1,8 +1,7 @@
 /** Durable completion-sound preferences. */
-import type {
-  ObservableSnapshot, SettingsScope, SnapshotStore,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   COMPLETION_SOUND_FIELD, COMPLETION_SOUND_TONE_FIELD, COMPLETION_SOUND_VOLUME_FIELD,
   DEFAULT_COMPLETION_SOUND, DEFAULT_COMPLETION_SOUND_TONE, DEFAULT_COMPLETION_SOUND_VOLUME,

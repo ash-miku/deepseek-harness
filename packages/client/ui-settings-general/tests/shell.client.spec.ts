@@ -1,7 +1,8 @@
 /** Settings shell registration: slot declaration injection, the ledger projections, and HMR recovery. */
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
+import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '../src/client/index.ts'
 import type { SettingsRootInjected } from '../src/client/shell-contract.ts'
@@ -18,20 +19,32 @@ async function bench() {
     getSnapshot: () => ({ active: 'zh', locales: [], revision: 0 }),
     subscribe: () => () => {},
   } as never)
-  const description = { version: 'test', cwd: '/tmp', attachedSessions: 0, canOpenPath: true }
+  // The shell mounts ui-settings, which injects `remote.settings`; without the
+  // namespace provided its fiber parks and no slot is ever declared.
+  const settings = {
+    describe: async () => ({ ok: false, error: new RemoteError('gateway/internal', 'no settings', {}) }),
+  }
+  const reconnect = vi.fn()
+  const connectionState = {
+    getSnapshot: () => 'connected' as const,
+    subscribe: () => () => {},
+  }
   ctx.provide('connection', {
-    api: { settings: { describe: async () => ({ result: { ok: false } }) } },
-    isLoopback: false,
-    // A settled connection: the host.describe riding the /api fence has
-    // already succeeded, which proves this page is fence-accepted.
-    hostDescription: {
-      getSnapshot: () => description,
-      subscribe: () => () => {},
-    },
+    state: connectionState,
+    reconnect,
+    // A settled connection: the first Host generation has already landed,
+    // which proves this page cleared the /api trust fence. The generation
+    // source (not `remote.$host`, a plain fact read) is the trust signal).
+    generation: { getSnapshot: () => ({ id: 1, host: {} }), subscribe: () => () => {} },
   } as never)
-  ctx.provide('remote', { $on: () => () => {} } as never)
+  ctx.provide('remote', {
+    $on: () => () => {},
+    $host: { home: undefined, isLoopback: false },
+    settings,
+  } as never)
+  ctx.provide('remote.settings', settings as never)
   await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
-  return { ctx, slots: ctx.get('slots') as SlotRegistry }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, connectionState, reconnect }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -58,7 +71,9 @@ const CHILD_SPECS = {
 
 describe('ui-settings apply', () => {
   it('declares only the slot registry (a pure composition face, no locale)', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'settingsScope'])
+    expect(inject).toEqual([
+      'slots', 'locale', 'connection', 'remote', 'remote.settings', 'settingsScope',
+    ])
   })
 
   it('registers the shell and declares every child slot, before or after the declaration', async () => {
@@ -107,6 +122,16 @@ describe('ui-settings apply', () => {
     expect(listener).toHaveBeenCalled()
     expect(sections.getSnapshot()).not.toBe(rows)
     off()
+  })
+
+  it('projects the Gateway connection control without copying its state', async () => {
+    const b = await bench()
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const injected = injectedOf(b.slots)
+    expect(injected.hooks.connectionState).toBe(b.connectionState)
+    injected.reconnect()
+    expect(b.reconnect).toHaveBeenCalledOnce()
   })
 
   it('projects onboarding entries into stable coordinator order', async () => {
@@ -163,22 +188,31 @@ describe('ui-settings apply', () => {
       subscribe: () => () => {},
     } as never)
     ctx.provide('connection', {
-      api: { settings: { describe: async () => ({ result: { ok: false } }) } },
       isLoopback: false,
-      hostDescription: {
+      generation: {
         getSnapshot: () => description,
         subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
       },
     } as never)
-    ctx.provide('remote', { $on: () => () => {} } as never)
+    // ui-settings injects both `remote` and `remote.settings`; without the
+    // namespace its fiber parks and `settingsScope` is never provided.
+    const settings = {
+      describe: async () => ({ ok: false, error: new RemoteError('gateway/internal', 'no settings', {}) }),
+    }
+    ctx.provide('remote', {
+      $on: () => () => {},
+      $host: { home: undefined, isLoopback: false },
+      settings,
+    } as never)
+    ctx.provide('remote.settings', settings as never)
     const slots = ctx.get('slots') as SlotRegistry
     declare(slots)
     await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
     expect(slots.entries('settings.action')).toHaveLength(0)
-    // The connection settles (host.describe succeeded — the fence accepted
-    // this LAN page): the action registers for the LAN page too.
+    // The connection settles (the first Host generation landed — the fence
+    // accepted this LAN page): the action registers for the LAN page too.
     description = { version: 'test', cwd: '/tmp', attachedSessions: 0, canOpenPath: true }
     for (const listener of listeners) listener()
     await Promise.resolve()

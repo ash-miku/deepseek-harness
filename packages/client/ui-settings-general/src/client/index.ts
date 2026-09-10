@@ -7,8 +7,10 @@
  * Feature-owned rows and sections stay with their features.
  * Export discipline: packages/client/AGENTS.md.
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// Type-only: pulls the ctx.remote merge and its fixed Host facts.
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: the settings slot declarations plus the ctx.settingsScope Context
 // merge. Cross-plugin collaboration goes through the service, never a value
@@ -16,6 +18,8 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls ctx.locale into this program.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {
   SettingsOnboardingStep, SettingsRootInjected, SettingsSectionRow,
 } from './shell-contract.ts'
@@ -53,7 +57,7 @@ const NS = 'settings'
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registrations depend on their slots through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection', 'settingsScope']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settings', 'settingsScope']
 
 /**
  * Register the `settings` dictionaries, the chrome content, and the General
@@ -62,24 +66,29 @@ export const inject = ['slots', 'locale', 'connection', 'settingsScope']
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-general: dictionaries')
+  const connection = ctx.get('connection') as ConnectionHandle
 
   // Copy freshness is framework-owned: components read the standard `t`
   // seat, and the nav label is a thunk the owner resolves per render — no
   // locale/change re-registration wiring.
   const t = ctx.locale.bind(NS)
-  const connection = ctx.get('connection') as ConnectionHandle
-  // The action follows the shared describe mirror, whose owning plugin
-  // refreshes it on document commits and reconnects. A non-loopback page may
-  // register once the host-description trust handshake has settled.
-  const documentController = new SettingsDocumentStore(connection.api, ctx.settingsScope.describe())
+  // The shared SettingsScope mirror updates after document commits and reconnects.
+  // The controller is built unconditionally: a non-loopback page reaches the
+  // same Host surface once its first generation clears the /api trust fence,
+  // which is a REGISTRATION gate below, not a construction gate here.
+  const documentController = new SettingsDocumentStore(ctx, ctx.settingsScope.describe())
   const documentInjected = (): SettingsDocumentActionInjected => ({
     controller: documentController,
     hooks: { snapshot: documentController.store },
   })
+  ctx.effect(() => () => { documentController.dispose() }, 'ui-settings-general: document action directory')
+  // A non-loopback page may be refused at the /api trust fence before its
+  // first Host generation lands, so registration (below) waits for that
+  // generation instead of being dropped for the whole session.
   let documentActionRegistered = false
   const registerDocumentAction = (): void => {
     if (documentActionRegistered) return
-    if (!connection.isLoopback && connection.hostDescription.getSnapshot() === undefined) return
+    if (!connection.isLoopback && connection.generation.getSnapshot() === undefined) return
     documentActionRegistered = true
     ctx.slots.inject('settings.action', () => ctx.slots.register({
       name: 'settings.action',
@@ -89,18 +98,9 @@ export function apply(ctx: ClientContext): void {
       inject: documentInjected,
     }, SettingsDocumentAction))
   }
-  ctx.effect(() => {
-    const reset = ctx.on('connection/reset', registerDocumentAction)
-    const disposers: Array<() => void> = [() => { reset() }]
-    if (!connection.isLoopback) {
-      disposers.push(connection.hostDescription.subscribe(registerDocumentAction))
-    }
-    registerDocumentAction()
-    return () => {
-      for (const dispose of disposers) dispose()
-      documentController.dispose()
-    }
-  }, 'ui-settings-general: document action directory')
+  if (!connection.isLoopback) {
+    ctx.effect(() => connection.generation.subscribe(registerDocumentAction), 'ui-settings-general: deferred document action')
+  }
   // The settings shell: this package occupies the sidebar-owned hole and
   // declares the settings slots. Ledger → nav-row projection as an observable
   // source (uSES contract: getSnapshot returns the cached rows until the
@@ -112,7 +112,9 @@ export function apply(ctx: ClientContext): void {
   let onboardingVersion = -1
   let onboardingSteps: readonly SettingsOnboardingStep[] = []
   const shellInjected = (): SettingsRootInjected => ({
+    reconnect: () => { connection.reconnect() },
     hooks: {
+      connectionState: connection.state,
       sections: {
         getSnapshot: () => {
           const version = ctx.slots.getVersion('settings.section')
@@ -161,6 +163,7 @@ export function apply(ctx: ClientContext): void {
   })
   ctx.slots.inject('sidebar.settings', () => ctx.slots.register({
     name: 'sidebar.settings',
+    locale: NS,
     children: {
       'settings.trigger': { kind: 'single', scope: 'root' },
       'settings.header': { kind: 'single', scope: 'root' },
@@ -176,6 +179,7 @@ export function apply(ctx: ClientContext): void {
     ctx.slots.register({ name: 'settings.trigger', locale: NS }, TriggerContent))
   ctx.slots.inject('settings.header', () =>
     ctx.slots.register({ name: 'settings.header', locale: NS }, HeaderContent))
+  registerDocumentAction()
   ctx.slots.inject('settings.close', () =>
     ctx.slots.register({ name: 'settings.close', locale: NS }, CloseLabel))
   ctx.slots.inject('settings.section', () => ctx.slots.register({

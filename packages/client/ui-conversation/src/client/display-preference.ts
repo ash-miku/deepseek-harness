@@ -1,26 +1,22 @@
 /**
- * Conversation display preferences. It owns the live process-density mode and
- * running-status labels, and mirrors writes to the durable Host settings scope.
+ * Conversation display preferences. It owns the live running-status labels
+ * shared by the Settings row and the Chat view, and mirrors writes to the
+ * durable Host settings scope.
  */
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
-  createSnapshotStore, type SettingsScope, type SnapshotStore,
-} from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationSettings } from '../submission-settings.ts'
-import {
-  DEFAULT_PROCESS_DISPLAY_MODE, DEFAULT_RUNNING_LABELS, normalizeRunningLabels,
-  PROCESS_DISPLAY_FIELD, RUNNING_LABELS_FIELD,
-  type ConversationProcessDisplayMode,
+  DEFAULT_RUNNING_LABELS, normalizeRunningLabels, RUNNING_LABELS_FIELD,
 } from '../submission-settings.ts'
+import type { ConversationSettings } from '../submission-settings.ts'
 
 /**
- * Reactive process-display preference used by both the Settings row and the
- * chat renderers.
+ * Reactive running-status labels used by both the Settings row and the Chat
+ * view. The completed-Turn transcript density is upstream's own
+ * `transcriptView` setting in ui-chat, so nothing here mirrors it.
  */
 export class ConversationDisplayPreference {
-  /** Reactive preference source for the Settings row and chat renderers. */
-  readonly displayMode: SnapshotStore<ConversationProcessDisplayMode> =
-    createSnapshotStore(DEFAULT_PROCESS_DISPLAY_MODE)
-  /** Reactive newline-separated running labels shared by the Settings row and chat. */
+  /** Reactive newline-separated labels: the Settings row's editing surface. */
   readonly runningLabels: SnapshotStore<string> = createSnapshotStore(DEFAULT_RUNNING_LABELS)
   private readonly host: SettingsScope<ConversationSettings> | undefined
 
@@ -37,17 +33,6 @@ export class ConversationDisplayPreference {
   }
 
   /**
-   * Change the chat process density; the live value publishes before the
-   * durable write starts.
-   * @param mode - Full, folded, or conclusion-only rendering.
-   */
-  setDisplayMode(mode: ConversationProcessDisplayMode): void {
-    if (this.displayMode.getSnapshot() === mode) return
-    this.displayMode.set(mode)
-    void this.host?.set(PROCESS_DISPLAY_FIELD, mode)
-  }
-
-  /**
    * Change the running-status labels; the live value publishes before the
    * durable write starts.
    * @param labels - newline-separated labels; blank restores the default.
@@ -59,15 +44,11 @@ export class ConversationDisplayPreference {
     void this.host?.set(RUNNING_LABELS_FIELD, normalized)
   }
 
+  /** Adopt the latest accepted Host section without writing it back. */
   private adopt(host: SettingsScope<ConversationSettings>): void {
     const section = host.getSnapshot().value
     if (section === undefined) return
-    if (this.displayMode.getSnapshot() !== section.processDisplay) {
-      this.displayMode.set(section.processDisplay)
-    }
     const labels = normalizeRunningLabels(section.runningLabels)
-    if (this.runningLabels.getSnapshot() !== labels) {
-      this.runningLabels.set(labels)
-    }
+    if (this.runningLabels.getSnapshot() !== labels) this.runningLabels.set(labels)
   }
 }

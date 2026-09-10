@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent } from '@testing-library/react'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import {
   CompletionSoundController, CompletionSoundPreference,
 } from '../src/client/completion-sound.ts'
@@ -192,7 +192,6 @@ describe('CompletionSoundPreference', () => {
       status: 'ready',
       value: {
         busyEnter: 'queue',
-        processDisplay: 'full',
         runningLabels: DEFAULT_RUNNING_LABELS,
         completionSound: false,
         completionSoundTone: 'bell',

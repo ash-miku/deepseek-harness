@@ -6,7 +6,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 16px 0;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .title {
@@ -17,13 +17,6 @@
 }
 
 .cubeRow {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.fontScaleRow {
   display: flex;
   align-items: stretch;
   gap: 8px;
@@ -42,8 +35,8 @@
   justify-content: center;
   gap: 4px;
   padding: 20px 32px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 16px;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: 20px;
   background: transparent;
   font: inherit;
   font-size: 14px;
@@ -53,30 +46,6 @@
 }
 
 .themeCube:hover:not(.selected) {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-/* Compact font-scale chip: same selected language as the theme cube but in
-   the 32px control rhythm used by the rest of the settings surface. */
-.fontScaleChip {
-  box-sizing: border-box;
-  flex: 1 1 96px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  padding: 0 16px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--dsw-alias-label-primary);
-  cursor: pointer;
-}
-
-.fontScaleChip:hover:not(.selected) {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 

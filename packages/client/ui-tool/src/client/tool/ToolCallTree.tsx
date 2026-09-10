@@ -1,7 +1,6 @@
 /** Root/subcall Tool composition with one keyed atomic dispatch path. */
-import { memo, useMemo, useState, type ReactNode } from 'react'
-import type { ToolCallBlock } from '@deepseek-ai/dsh-client-runtime/client'
-import { DisclosureRow, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { memo, useMemo, type ReactNode } from 'react'
+import type { ToolCallBlock } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ToolCallOwnerProps, ToolTreeProps } from '../contract/slots.ts'
 import { GenericToolCard } from './toolviews/GenericToolCard.tsx'
 import css from './ToolCallTree.module.css'
@@ -11,19 +10,13 @@ function callName(node: ToolCallBlock): string {
   return 'kind' in node ? node.call?.name ?? '' : node.name
 }
 
-/** Count a root call and every recursive subcall for folded summaries. */
-function callCount(block: ToolCallBlock): number {
-  return 1 + block.subCalls.reduce((total, child) => total + callCount(child), 0)
-}
-
 /** One atomic call dispatched through the Tool-owned keyed slot. */
 const ToolCall = memo(function ToolCall({
-  renderSlot, callId, toolName, block, openFile, selected, cwd, home, inspectCall, t, children,
-}: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 't'> & {
+  renderSlot, callId, toolName, block, openFile, cwd, home, inspectCall, loadImage, t, children,
+}: Pick<ToolTreeProps, 'renderSlot' | 'openFile' | 'cwd' | 'inspectCall' | 'loadImage' | 't'> & {
   callId: string
   toolName: string
   block: ToolCallBlock
-  selected: boolean
   home?: string | undefined
   children?: ReactNode
 }) {
@@ -34,14 +27,14 @@ const ToolCall = memo(function ToolCall({
     openFile,
     cwd,
     home,
+    loadImage,
     inspect: () => { inspectCall(callId) },
-  }), [callId, toolName, block, openFile, cwd, home, inspectCall])
+  }), [callId, toolName, block, openFile, cwd, home, loadImage, inspectCall])
   return (
     <div
       className={css.callRow}
       data-chat-anchor-key={`call:${callId}`}
       data-chat-call-id={callId}
-      data-selected={selected || undefined}
     >
       {renderSlot('tool.call.toolview', owner, {
         entryKey: toolName,
@@ -53,8 +46,8 @@ const ToolCall = memo(function ToolCall({
 })
 
 const ToolCallBranch = memo(function ToolCallBranch({
-  renderSlot, block, selectedCallId, cwd, home, openFile, inspectCall, t,
-}: Pick<ToolTreeProps, 'renderSlot' | 'selectedCallId' | 'cwd' | 'openFile' | 'inspectCall' | 't'> & {
+  renderSlot, block, cwd, home, openFile, inspectCall, loadImage, t,
+}: Pick<ToolTreeProps, 'renderSlot' | 'cwd' | 'openFile' | 'inspectCall' | 'loadImage' | 't'> & {
   block: ToolCallBlock
   home?: string | undefined
 }) {
@@ -65,10 +58,10 @@ const ToolCallBranch = memo(function ToolCallBranch({
       toolName={callName(block)}
       block={block}
       openFile={openFile}
-      selected={block.callId === selectedCallId}
       cwd={cwd}
       home={home}
       inspectCall={inspectCall}
+      loadImage={loadImage}
       t={t}
     >
       {block.subCalls.length > 0 ? (
@@ -78,11 +71,11 @@ const ToolCallBranch = memo(function ToolCallBranch({
               key={child.callId}
               renderSlot={renderSlot}
               block={child}
-              selectedCallId={selectedCallId}
               cwd={cwd}
               home={home}
               openFile={openFile}
               inspectCall={inspectCall}
+              loadImage={loadImage}
               t={t}
             />
           ))}
@@ -98,64 +91,21 @@ const ToolCallBranch = memo(function ToolCallBranch({
  * @param props - whole-Tool owner data and the Tool-owned child-slot share.
  * @returns the Tool call tree.
  */
-/** One compact fold row that reveals the full tool tree on demand. */
-function ProcessDisclosure({ count, children, t }: {
-  count: number
-  children: ReactNode
-  t: ToolTreeProps['t']
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className={css.foldSummary} data-fold-process>
-      <DisclosureRow
-        rowClassName={css.foldRow}
-        leadingClassName={css.foldLeading}
-        titleClassName={css.foldTitle}
-        chevronClassName={css.foldChevron}
-        icon={<IconThinkOutline14 size={14} />}
-        title={t('process.toolTitle')}
-        open={open}
-        expandable
-        expandOnRowClick
-        onToggle={() => { setOpen(value => !value) }}
-        collapsedContent={(
-          <span className={css.foldSummaryText}>{t('process.toolCount', { count })}</span>
-        )}
-      >
-        <div className={css.foldBody}>{children}</div>
-      </DisclosureRow>
-    </div>
-  )
-}
-
-/**
- * Render one root Tool call and its recursive children through the same
- * keyed atomic dispatch.
- * @param props - whole-Tool owner data and the Tool-owned child-slot share.
- * @returns the Tool call tree.
- */
 export function ToolCallTree({
-  renderSlot, node, selectedCallId, cwd, displayMode, foldGroup, openFile, inspectCall, useHostDescription, t,
+  renderSlot, node, cwd, openFile, inspectCall, loadImage, useHostInfo, t,
 }: ToolTreeProps) {
-  const home = useHostDescription(description => description?.home)
+  const home = useHostInfo(info => info.home)
   const block = node.data.root
-  const mode = displayMode ?? 'full'
-  if (mode === 'conclusion') return null
-  const fullTree = (
+  return (
     <ToolCallBranch
       renderSlot={renderSlot}
       block={block}
-      selectedCallId={selectedCallId}
       cwd={cwd}
       home={home}
       openFile={openFile}
       inspectCall={inspectCall}
+      loadImage={loadImage}
       t={t}
     />
   )
-  if (mode === 'fold') {
-    if (foldGroup?.first === false) return null
-    return <ProcessDisclosure count={foldGroup?.count ?? callCount(block)} t={t}>{fullTree}</ProcessDisclosure>
-  }
-  return fullTree
 }

@@ -17,9 +17,6 @@ export type BusyEnterBehavior = typeof BUSY_ENTER_BEHAVIORS[number]
 /** Default preserves Enter-as-Queue for running conversations. */
 export const DEFAULT_BUSY_ENTER_BEHAVIOR: BusyEnterBehavior = 'queue'
 
-/** Field carrying how much assistant process detail the chat renders. */
-export const PROCESS_DISPLAY_FIELD = 'processDisplay'
-
 /** Field carrying user-authored running-status labels, one per line. */
 export const RUNNING_LABELS_FIELD = 'runningLabels'
 
@@ -69,21 +66,10 @@ export function normalizeRunningLabels(value: string): string {
   return labels.length === 0 ? DEFAULT_RUNNING_LABELS : labels.join('\n')
 }
 
-/** Process display modes accepted at settings and render boundaries. */
-export const PROCESS_DISPLAY_MODES = ['full', 'fold', 'conclusion'] as const
-
-/** Configurable density of thinking summaries and tool-call rows. */
-export type ConversationProcessDisplayMode = typeof PROCESS_DISPLAY_MODES[number]
-
-/** Default preserves the current full process rendering. */
-export const DEFAULT_PROCESS_DISPLAY_MODE: ConversationProcessDisplayMode = 'full'
-
 /** Durable conversation section shared by the Host schema and the browser scope. */
 export interface ConversationSettings {
   /** Delivery mode for plain Enter while the addressed agent is busy. */
   busyEnter: BusyEnterBehavior
-  /** Density of thinking summaries and tool-call rows in the chat flow. */
-  processDisplay: ConversationProcessDisplayMode
   /** Newline-separated labels shown while the agent is running. */
   runningLabels: string
   /** Whether a browser sound plays after a completed turn. */
@@ -97,7 +83,6 @@ export interface ConversationSettings {
 /** Durable conversation schema; also the wire envelope the browser scope validates against. */
 export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
   [BUSY_ENTER_FIELD]: z.union([...BUSY_ENTER_BEHAVIORS]).default(DEFAULT_BUSY_ENTER_BEHAVIOR),
-  [PROCESS_DISPLAY_FIELD]: z.union([...PROCESS_DISPLAY_MODES]).default(DEFAULT_PROCESS_DISPLAY_MODE),
   [RUNNING_LABELS_FIELD]: z.string().default(DEFAULT_RUNNING_LABELS),
   [COMPLETION_SOUND_FIELD]: z.boolean().default(DEFAULT_COMPLETION_SOUND),
   [COMPLETION_SOUND_TONE_FIELD]: z.union([...COMPLETION_SOUND_TONES]).default(DEFAULT_COMPLETION_SOUND_TONE),
