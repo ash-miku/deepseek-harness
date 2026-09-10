@@ -46,7 +46,7 @@ afterEach(async () => {
 })
 
 async function loadComposition(
-  options: { withDynamic: boolean; baseURL: string; reuseRoot?: string; enableSessionLog?: boolean },
+  options: { withDynamic: boolean; baseURL: string; reuseRoot?: string; enableSessionLog?: boolean; localProfilePlugin?: boolean },
 ): Promise<{ ctx: Context; settingsPath: string; credentialsPath: string }> {
   // A reused root is the restart case: the same harness home, its documents
   // exactly as the previous process left them.
@@ -60,8 +60,15 @@ async function loadComposition(
     await writeFile(credentialsPath, 'version: 1\nrefs:\n  DEEPSEEK_API_KEY: boot-key\n', { mode: 0o600 })
   }
 
+  if (options.localProfilePlugin) {
+    await writeFile(join(root, 'package.json'), JSON.stringify({
+      name: 'dsh-profile-web', private: true, dsh: { profile: { bundles: [] } },
+    }))
+    await writeFile(join(root, 'local-plugin.mjs'), 'export default () => {}\n')
+  }
   const configPath = join(root, 'cordis.yml')
   await writeFile(configPath, [
+    ...options.localProfilePlugin ? ['- id: local-plugin', '  name: ./local-plugin.mjs'] : [],
     '- id: llm',
     "  name: '@deepseek-ai/dsh-llm'",
     '- id: session',
@@ -128,6 +135,9 @@ async function loadComposition(
   ctx.loader.internal = {
     version: 'v2',
     async import(specifier: string) {
+      if (specifier === './local-plugin.mjs' && options.localProfilePlugin) {
+        return import(pathToFileURL(join(root!, 'local-plugin.mjs')).href)
+      }
       if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
       return modules.get(specifier)
     },
@@ -141,6 +151,21 @@ async function loadComposition(
 }
 
 describe('llm-deepseek real dynamic composition', () => {
+  it('sends requests with a local plugin owned by an unversioned profile manifest', async () => {
+    vi.stubEnv('DEEPSEEK_API_KEY', 'entry-key')
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const { ctx } = await loadComposition({
+      withDynamic: false, baseURL: server.url, localProfilePlugin: true,
+    })
+
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.finish).toEqual({ kind: 'stop' })
+    expect(server.requests).toHaveLength(1)
+    const request = server.requests[0] as { dsh_plugin_packages: { packages: { name: string }[] } }
+    expect(request.dsh_plugin_packages.packages.length).toBeGreaterThan(0)
+    expect(request.dsh_plugin_packages.packages.map(item => item.name)).not.toContain('dsh-profile-web')
+  })
+
   it('keeps session upload off and package inventory on by default in the real Loader composition', async () => {
     vi.stubEnv('DEEPSEEK_API_KEY', 'entry-key')
     const server = await mockServer([{ kind: 'sse', events: textEvents }])
