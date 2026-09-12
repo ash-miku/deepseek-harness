@@ -201,10 +201,17 @@ describe('ui-settings-models apply', () => {
   })
 
   it('keeps remote-browser acknowledgement in process memory', async () => {
-    const b = await bench(false, {
-      describe: vi.fn(() => Promise.reject(new Error('transport failure for /api/settings.describe: HTTP 403'))),
-      mutate: vi.fn(),
-    })
+    const b = await bench(false, RemoteMock.create().load({
+      ...remoteDefaultResponses,
+      unary: {
+        ...remoteDefaultResponses.unary,
+        // A remote browser's settings transport is refused at the /api fence;
+        // the acknowledgement then stays process-local instead of failing.
+        'settings/describe': () => Promise.reject(
+          new Error('transport failure for /api/settings.describe: HTTP 403'),
+        ),
+      },
+    }))
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const entry = b.slots.entries('settings.onboarding')
