@@ -145,6 +145,9 @@ export function apply(ctx: Context): void {
     connectionState = state
     if (state === 'disconnected') sessions.handleDisconnected()
   }), 'session-controller.client.connectionState')
+  // The baseline retry is process-local work, so a disposed client must not
+  // pull against an inactive context: losing the generation also cancels it.
+  ctx.effect(() => () => { sessions.handleDisconnected() }, 'session-controller.client.baselineRetry')
   if (ctx.remote.$host.home !== undefined) sessions.handleConnected()
   ctx.typert.contexts.registerClient('agent', {
     identity: candidate => sessions.scopeOf(candidate),
