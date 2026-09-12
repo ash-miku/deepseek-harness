@@ -2,16 +2,40 @@
    Modules. Cite pills, header anchors, and thinking-small variants are
    intentionally absent (no matching DOM). Token names match that sheet. */
 
+/* Colored copy (headings, bold, inline code, quotes) reads its accent through
+   a mode-aware blend. Light is the default: each signal token is darkened
+   against the static black token rather than the light background. Scaling a
+   color toward pure black lowers its lightness while preserving its hue's
+   saturation, so the accent stays clearly colored instead of graying out;
+   blending toward the near-white surface is what made the raw accents glare.
+   Experiment: light mode borrows the dark palette's exact accent rendering —
+   the same 84/84/82/78 mixes over the dark base surface. Both schemes then
+   paint identical accent colors; the dark override below still owns the dark
+   side so the two can diverge again from one place. */
 .markdown {
+  --dsh-markdown-heading: color-mix(in srgb, var(--dsw-static-deepseek-400) 84%, var(--dsw-static-neutral-bluish-950));
+  --dsh-markdown-strong: color-mix(in srgb, var(--dsw-static-amber-500) 84%, var(--dsw-static-neutral-bluish-950));
+  --dsh-markdown-inline-code: color-mix(in srgb, var(--dsw-static-green-500) 82%, var(--dsw-static-neutral-bluish-950));
+  --dsh-markdown-quote: color-mix(in srgb, var(--dsw-static-amber-500) 78%, var(--dsw-static-neutral-bluish-950));
+  --dsh-markdown-marker: var(--dsh-markdown-heading);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font: var(--dsw-font-markdown-base);
+  /* Base weight rides the Theme settings Font-weight axis (the token already
+     carries it; this keeps the declaration explicit for the markdown sheet). */
+  font-weight: var(--dsh-content-font-weight, 500);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Dark keeps the original vivid-on-dark blend: on the near-black surface the
+   signal tokens stay legible and only a touch of the background is needed to
+   seat them, so the light-mode ratios above must not leak into it. */
+:global(body[data-ds-dark-theme]) .markdown {
   --dsh-markdown-heading: color-mix(in srgb, var(--dsw-alias-state-business-primary) 84%, var(--dsw-alias-bg-base));
   --dsh-markdown-strong: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 84%, var(--dsw-alias-bg-base));
   --dsh-markdown-inline-code: color-mix(in srgb, var(--dsw-alias-state-success-primary) 82%, var(--dsw-alias-bg-base));
   --dsh-markdown-quote: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 78%, var(--dsw-alias-bg-base));
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font: var(--dsw-font-markdown-base);
-  font-weight: 500;
-  color: var(--dsw-alias-label-primary);
+  --dsh-markdown-marker: var(--dsw-alias-state-business-primary);
 }
 
 .markdown strong {
@@ -54,7 +78,9 @@
 }
 
 .markdown em {
-  color: var(--dsh-markdown-quote);
+  /* Same amber as <strong>: italic is another inline emphasis, so it should
+     not read as a dimmer, separate tone. */
+  color: var(--dsh-markdown-strong);
   font-style: italic;
   font-weight: 700;
 }
@@ -129,7 +155,7 @@
 
 .markdown li::marker {
   line-height: 28px;
-  color: var(--dsw-alias-state-business-primary);
+  color: var(--dsh-markdown-marker);
 }
 
 /* Nested ol under ul/ol: markers inside (models sometimes emit this shape). */

@@ -4,10 +4,17 @@
  * font stack deliberately omits a bare `monospace` tail (Windows CJK falls
  * back to SimSun otherwise). */
 :root {
+  /* CJK families sit after the Latin-first families but before the generic
+     tail: the platform face (PingFang SC / Microsoft YaHei) wins when present,
+     and the Noto/Source-Han names otherwise keep the fallback on a family
+     that actually ships a Medium (500) cut. Without one, intermediate weights
+     snap to Regular and only 600+ turns into a real Bold. */
   --dsw-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    'Hiragino Sans GB', 'Noto Sans SC', 'Noto Sans CJK SC', 'Source Han Sans SC',
+    'HarmonyOS Sans SC', 'MiSans', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --ds-font-family-code: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas,
-    'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+    'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Noto Sans SC', 'Noto Sans CJK SC',
+    'Source Han Sans SC', 'Microsoft YaHei';
   --ds-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ds-transition-duration: 0.2s;
   --ds-transition-duration-fast: 0.1s;

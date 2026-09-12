@@ -5,21 +5,21 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-settings'
 import { bootThemeInjection } from './boot-theme.ts'
 import {
-  DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema,
-  type ThemePreference, type ThemeSettings,
+  DEFAULT_FONT_SIZE, DEFAULT_FONT_WEIGHT, DEFAULT_PREFERENCE, THEME_SETTINGS_NAMESPACE, ThemeSettingsSchema,
+  type ThemeFontWeight, type ThemePreference, type ThemeSettings,
 } from './theme-settings.ts'
 
 export {
-  DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, FONT_SIZE_FIELD, FONT_SIZE_MAX, FONT_SIZE_MIN,
-  THEME_PREFERENCE_FIELD, THEME_PREFERENCES, THEME_SETTINGS_NAMESPACE,
-  type ThemePreference, type ThemeSettings,
+  DEFAULT_FONT_SIZE, DEFAULT_FONT_WEIGHT, DEFAULT_PREFERENCE, FONT_SIZE_FIELD, FONT_SIZE_MAX, FONT_SIZE_MIN,
+  FONT_WEIGHT_FIELD, FONT_WEIGHTS, THEME_PREFERENCE_FIELD, THEME_PREFERENCES, THEME_SETTINGS_NAMESPACE,
+  type ThemeFontWeight, type ThemePreference, type ThemeSettings,
 } from './theme-settings.ts'
 
 const THEME_NAMESPACE = THEME_SETTINGS_NAMESPACE
 
 /** Read the registered theme section or the schema defaults without a settings provider. */
-function readSection(ctx: Context): { preference: ThemePreference; fontSize: number } {
-  const fallback = { preference: DEFAULT_PREFERENCE, fontSize: DEFAULT_FONT_SIZE }
+function readSection(ctx: Context): { preference: ThemePreference; fontSize: number; fontWeight: ThemeFontWeight } {
+  const fallback = { preference: DEFAULT_PREFERENCE, fontSize: DEFAULT_FONT_SIZE, fontWeight: DEFAULT_FONT_WEIGHT }
   const settings = ctx.get('settings')
   if (settings === undefined) return fallback
   const section = settings.get(THEME_NAMESPACE) as ThemeSettings | undefined
@@ -39,6 +39,6 @@ export function apply(ctx: Context): void {
   })
   ctx.on('webserver/index-inject', (table) => {
     const section = readSection(ctx)
-    table.push(bootThemeInjection(section.preference, section.fontSize))
+    table.push(bootThemeInjection(section.preference, section.fontSize, section.fontWeight))
   })
 }

@@ -1,0 +1,68 @@
+/* Font-weight row: title + description + a three-step segmented control, same
+ * cell rhythm as the font-size row (gap 8, pad 16/0, hairline separator; the
+ * section column strips the separator on its last child). */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 48px;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.desc {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Segmented control: a module-fill track holding three equal text pills; the
+ * selected pill floats on the layer-1 surface. */
+.control {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 18px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.step {
+  appearance: none;
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 15px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.step:hover:not(.selected) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.selected {
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+}

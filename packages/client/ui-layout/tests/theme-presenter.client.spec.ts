@@ -3,16 +3,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import {
-  CONTENT_FONT_SIZE_VARIABLE, DARK_ATTRIBUTE, ThemePresenter,
+  CONTENT_FONT_SIZE_VARIABLE, CONTENT_FONT_WEIGHT_VARIABLE, DARK_ATTRIBUTE, ThemePresenter,
 } from '@deepseek-ai/dsh-client-ui-layout/src/client/theme-presenter.ts'
 
 const LIGHT_THEME_COLOR = 'rgb(255, 255, 255)'
 const DARK_THEME_COLOR = 'rgb(21, 21, 23)'
 
-function snapshot(colorScheme: 'light' | 'dark', tokens: Record<string, string> = {}, fontSize = 14): ThemeSnapshot {
+function snapshot(colorScheme: 'light' | 'dark', tokens: Record<string, string> = {}, fontSize = 14, fontWeight: 400 | 500 | 600 = 500): ThemeSnapshot {
   // The presenter must key off colorScheme, not the id — keep them distinct.
   const active = { id: `${colorScheme}-test`, colorScheme, tokens }
-  return { preference: colorScheme, fontSize, active, themes: [active], revision: 1 }
+  return { preference: colorScheme, fontSize, fontWeight, active, themes: [active], revision: 1 }
 }
 
 function clearThemePresentation(): void {
@@ -46,6 +46,7 @@ describe('ThemePresenter', () => {
     expect(document.documentElement.style.colorScheme).toBe('light')
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(false)
     expect(document.body.style.getPropertyValue(CONTENT_FONT_SIZE_VARIABLE)).toBe('14px')
+    expect(document.body.style.getPropertyValue(CONTENT_FONT_WEIGHT_VARIABLE)).toBe('500')
     expect(themeColorMeta()?.content).toBe(LIGHT_THEME_COLOR)
   })
 
@@ -72,6 +73,14 @@ describe('ThemePresenter', () => {
     expect(document.body.style.getPropertyValue(CONTENT_FONT_SIZE_VARIABLE)).toBe('17px')
   })
 
+  it('projects the persisted font weight onto the body and updates on change', () => {
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('dark', {}, 14, 400))
+    expect(document.body.style.getPropertyValue(CONTENT_FONT_WEIGHT_VARIABLE)).toBe('400')
+    presenter.apply(snapshot('dark', {}, 14, 600))
+    expect(document.body.style.getPropertyValue(CONTENT_FONT_WEIGHT_VARIABLE)).toBe('600')
+  })
+
   it('applies tokens as inline variables and clears the previous set on theme change', () => {
     const presenter = new ThemePresenter()
     presenter.apply(snapshot('dark', { '--dsw-alias-bg': '#111', '--dsw-alias-fg': '#eee' }))
@@ -92,6 +101,7 @@ describe('ThemePresenter', () => {
     expect(document.documentElement.style.colorScheme).toBe('')
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(false)
     expect(document.body.style.getPropertyValue(CONTENT_FONT_SIZE_VARIABLE)).toBe('')
+    expect(document.body.style.getPropertyValue(CONTENT_FONT_WEIGHT_VARIABLE)).toBe('')
     expect(document.body.style.getPropertyValue('--dsw-alias-bg')).toBe('')
     expect(document.body.style.getPropertyValue('--dsh-content-font-size')).toBe('')
     expect(document.body.style.getPropertyValue('--foreign')).toBe('kept')

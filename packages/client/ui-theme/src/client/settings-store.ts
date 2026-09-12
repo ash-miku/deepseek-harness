@@ -4,7 +4,10 @@
  * row components read via props.useStore.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
-import { DEFAULT_FONT_SIZE, type ThemePreference } from '../theme-settings.ts'
+import {
+  DEFAULT_FONT_SIZE, DEFAULT_FONT_WEIGHT,
+  type ThemeFontWeight, type ThemePreference,
+} from '../theme-settings.ts'
 
 /** Store state mirrored from the theme snapshot. */
 export interface AppearanceRowState {
@@ -60,6 +63,36 @@ export function createFontSizeRowStore(): EngineStoreHandle<FontSizeRowState, Fo
       sync: (d, fontSize: number, revision: number) => {
         if (revision <= d.revision) return
         d.fontSize = fontSize
+        d.revision = revision
+      },
+    },
+  })
+}
+
+/** Store state mirrored from the theme snapshot's base font weight. */
+export interface FontWeightRowState {
+  /** Persisted interface base font weight. */
+  fontWeight: ThemeFontWeight
+  /** Service revision; -1 until first sync so revision 0 lands as a change. */
+  revision: number
+}
+
+/** Declared action shape giving the exported factory a stable return type. */
+type FontWeightRowActions = {
+  sync: (draft: FontWeightRowState, fontWeight: ThemeFontWeight, revision: number) => void
+}
+
+/**
+ * Declares the font-weight row state and write surface.
+ * @returns the store handle.
+ */
+export function createFontWeightRowStore(): EngineStoreHandle<FontWeightRowState, FontWeightRowActions> {
+  return defineStore({
+    init: (): FontWeightRowState => ({ fontWeight: DEFAULT_FONT_WEIGHT, revision: -1 }),
+    actions: {
+      sync: (d, fontWeight: ThemeFontWeight, revision: number) => {
+        if (revision <= d.revision) return
+        d.fontWeight = fontWeight
         d.revision = revision
       },
     },

@@ -70,7 +70,7 @@
 
 .title {
   color: var(--dsh-tool-title);
-  font-weight: 400;
+  font-weight: var(--dsh-content-font-weight, 500);
 }
 
 .sep {

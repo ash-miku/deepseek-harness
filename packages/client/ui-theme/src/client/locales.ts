@@ -11,6 +11,11 @@ export const zh = {
   'fontSize.unit': 'px',
   'fontSize.increase': '增大字号',
   'fontSize.decrease': '减小字号',
+  'fontWeight.title': '字重',
+  'fontWeight.description': '调整整页文字的字重',
+  'fontWeight.regular': '常规',
+  'fontWeight.medium': '中等',
+  'fontWeight.semibold': '加粗',
 } satisfies Record<string, string>
 
 /** The settings.theme namespace key union. */
@@ -27,4 +32,9 @@ export const en = {
   'fontSize.unit': 'px',
   'fontSize.increase': 'Increase font size',
   'fontSize.decrease': 'Decrease font size',
+  'fontWeight.title': 'Font weight',
+  'fontWeight.description': 'Adjusts text weight across the interface',
+  'fontWeight.regular': 'Regular',
+  'fontWeight.medium': 'Medium',
+  'fontWeight.semibold': 'Bold',
 } satisfies Record<ThemeKey, string>

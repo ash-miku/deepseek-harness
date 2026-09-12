@@ -16,6 +16,9 @@ export const DARK_ATTRIBUTE = 'data-ds-dark-theme'
 /** Body variable carrying the user's content font size in px. */
 export const CONTENT_FONT_SIZE_VARIABLE = '--dsh-content-font-size'
 
+/** Body variable carrying the user's interface base font weight. */
+export const CONTENT_FONT_WEIGHT_VARIABLE = '--dsh-content-font-weight'
+
 /** Applies theme snapshots to the document; one instance per plugin fiber. */
 export class ThemePresenter {
   /** Token names this presenter wrote in the last apply (its retraction set). */
@@ -45,6 +48,7 @@ export class ThemePresenter {
     if (scheme === 'dark') body.setAttribute(DARK_ATTRIBUTE, '')
     else body.removeAttribute(DARK_ATTRIBUTE)
     body.style.setProperty(CONTENT_FONT_SIZE_VARIABLE, `${snapshot.fontSize}px`)
+    body.style.setProperty(CONTENT_FONT_WEIGHT_VARIABLE, String(snapshot.fontWeight))
     for (const name of this.appliedTokens) body.style.removeProperty(name)
     this.appliedTokens = []
     for (const [name, value] of Object.entries(snapshot.active.tokens)) {
@@ -61,6 +65,7 @@ export class ThemePresenter {
     const body = document.body
     body.removeAttribute(DARK_ATTRIBUTE)
     body.style.removeProperty(CONTENT_FONT_SIZE_VARIABLE)
+    body.style.removeProperty(CONTENT_FONT_WEIGHT_VARIABLE)
     for (const name of this.appliedTokens) body.style.removeProperty(name)
     this.appliedTokens = []
     this.themeColorMeta.remove()

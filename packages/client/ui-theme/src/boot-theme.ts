@@ -6,10 +6,13 @@
  */
 
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
-import { DEFAULT_FONT_SIZE, DEFAULT_PREFERENCE, type ThemePreference } from './theme-settings.ts'
+import {
+  DEFAULT_FONT_SIZE, DEFAULT_FONT_WEIGHT, DEFAULT_PREFERENCE,
+  type ThemeFontWeight, type ThemePreference,
+} from './theme-settings.ts'
 
 /** Build the inline script body for one schema-validated durable theme section. */
-function bootThemeScript(preference: ThemePreference, fontSize: number): string {
+function bootThemeScript(preference: ThemePreference, fontSize: number, fontWeight: ThemeFontWeight): string {
   return `(() => {
   const preference = ${JSON.stringify(preference)}
   const systemDark = preference === 'system'
@@ -19,6 +22,7 @@ function bootThemeScript(preference: ThemePreference, fontSize: number): string 
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
   document.body.toggleAttribute('data-ds-dark-theme', dark)
   document.body.style.setProperty('--dsh-content-font-size', ${JSON.stringify(`${fontSize}px`)})
+  document.body.style.setProperty('--dsh-content-font-weight', ${JSON.stringify(`${fontWeight}`)})
 })()`
 }
 
@@ -32,6 +36,7 @@ function bootThemeScript(preference: ThemePreference, fontSize: number): string 
 export function bootThemeInjection(
   preference: ThemePreference = DEFAULT_PREFERENCE,
   fontSize: number = DEFAULT_FONT_SIZE,
+  fontWeight: ThemeFontWeight = DEFAULT_FONT_WEIGHT,
 ): IndexInjection {
-  return { kind: 'script', placement: 'body', text: bootThemeScript(preference, fontSize) }
+  return { kind: 'script', placement: 'body', text: bootThemeScript(preference, fontSize, fontWeight) }
 }
