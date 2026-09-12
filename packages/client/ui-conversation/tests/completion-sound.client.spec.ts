@@ -6,7 +6,7 @@ import {
   CompletionSoundController, CompletionSoundPreference,
 } from '../src/client/completion-sound.ts'
 import {
-  DEFAULT_COMPLETION_SOUND_TONE, DEFAULT_COMPLETION_SOUND_VOLUME, DEFAULT_RUNNING_LABELS,
+  DEFAULT_COMPLETION_SOUND_TONE, DEFAULT_COMPLETION_SOUND_VOLUME,
   type CompletionSoundTone, type ConversationSettings,
 } from '../src/submission-settings.ts'
 import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
@@ -192,7 +192,6 @@ describe('CompletionSoundPreference', () => {
       status: 'ready',
       value: {
         busyEnter: 'queue',
-        runningLabels: DEFAULT_RUNNING_LABELS,
         completionSound: false,
         completionSoundTone: 'bell',
         completionSoundVolume: 60,

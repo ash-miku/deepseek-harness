@@ -82,7 +82,7 @@ describe('target-neutral Conversation apply wiring', () => {
       .toEqual({ kind: 'chain', scope: 'session' })
     expect(b.runtime.slots.entries('settings.general.item').map(row => row.options.id))
       .toEqual([
-        'composer-enter', 'conversation-running-label',
+        'composer-enter',
         'conversation-completion-sound', 'conversation-completion-sound-volume',
       ])
     await b.runtime.dispose()

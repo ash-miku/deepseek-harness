@@ -59,30 +59,10 @@ export interface ChatFileMentions {
   forClosing(owner: TurnTailOwnerProps, sessionId: SessionId): MarkdownFileMentions | undefined
 }
 
-/** Read-only reactive value: the accepted labels plus their change signal. */
-export interface ChatRunningLabelsSource {
-  /**
-   * Latest accepted running-status labels, already trimmed and non-empty.
-   * @returns the current label list; an empty list means "use the default".
-   */
-  getSnapshot(): readonly string[]
-  /**
-   * Observe label changes.
-   * @param onChange - called after every accepted change.
-   * @returns the unsubscribe.
-   */
-  subscribe(onChange: () => void): () => void
-}
-
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Optional prose file-mention provider. */
     chatFileMentions: ChatFileMentions
-    /**
-     * Optional running-status label provider owned by the Conversation
-     * settings; absent compositions keep the built-in label.
-     */
-    chatRunningLabels: ChatRunningLabelsSource
   }
 }
 
@@ -173,11 +153,6 @@ export interface ChatViewInjected {
   }
   forkAt: (seq: number) => void
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
-  /**
-   * User-authored running-status labels; absent compositions keep the built-in
-   * label. The view owns no settings dependency so it can render standalone.
-   */
-  runningLabels?: ChatRunningLabelsSource | undefined
 }
 
 /** Full Chat view props. */

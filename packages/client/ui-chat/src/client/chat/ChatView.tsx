@@ -1,10 +1,7 @@
 // An enclosing `[data-conversation-scroll]` owns scrolling when present;
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
-import {
-  memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore,
-  type ComponentProps,
-} from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import type {
   ConversationTimelineSnapshot, RenderMessageImages,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -17,32 +14,10 @@ import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { mergeTurnRailItems, type TurnRailItem } from './turn-rail-items.ts'
 import { formatRunDuration } from './message-chrome.ts'
-import { segmentRunningLabel } from './running-label-emoji.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
 const SCROLL_SAMPLE_INTERVAL_MS = 500
-
-/** Stable empty label list: a snapshot read must never mint a new array. */
-const NO_RUNNING_LABELS: readonly string[] = []
-
-/** How long one user-authored running label stays before the next rotation. */
-const RUNNING_LABEL_ROTATE_MS = 5_000
-
-/**
- * Choose the label to show, avoiding an immediate repeat while alternatives exist.
- * @param labels - accepted labels; never empty at call sites.
- * @param previous - the label currently shown, or null on the first pick.
- * @returns the next label.
- */
-function chooseRunningLabel(labels: readonly string[], previous: string | null): string {
-  const candidates = labels.length > 1
-    ? labels.filter(label => label !== previous)
-    : labels
-  return candidates[Math.floor(Math.random() * candidates.length)]
-    ?? labels[0]
-    ?? ''
-}
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -190,28 +165,14 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
 }
 
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
-function TurnStatus({ startTime, labels, t }: {
+function TurnStatus({ startTime, t }: {
   /** The running turn's logged `turn/start` time; null falls back to mount
    *  time when that boundary is outside the window. */
   startTime: number | null
-  /** User-authored labels, already trimmed; more than one rotates while running. */
-  labels: readonly string[]
   /** The owning view's locale seat. */
   t: ChatViewSlotProps['t']
 }) {
   const [mountedAt] = useState(() => Date.now())
-  const [label, setLabel] = useState(() => chooseRunningLabel(labels, null))
-  useEffect(() => {
-    setLabel(current => chooseRunningLabel(labels, current))
-    if (labels.length <= 1) return
-    const id = setInterval(() => {
-      setLabel(current => chooseRunningLabel(labels, current))
-    }, RUNNING_LABEL_ROTATE_MS)
-    return () => { clearInterval(id) }
-  }, [labels])
-  // Emoji must stay outside the shimmer's text fill or the gradient paints
-  // them monochrome.
-  const segments = useMemo(() => segmentRunningLabel(label), [label])
   // Anchored to turn/start so a mid-turn reload keeps the real
   // elapsed time and the final footer's Ran-for label matches this clock.
   const anchor = startTime ?? mountedAt
@@ -229,14 +190,7 @@ function TurnStatus({ startTime, labels, t }: {
   const showClock = elapsedMs >= 15_000
   return (
     <div className={css.turnStatus} role="status" aria-live="polite">
-      {label === '' ? t('chat.deepDiving') : segments.map((part, index) => (
-        <span
-          key={index}
-          className={part.emoji ? css.turnStatusEmoji : css.turnStatusText}
-        >
-          {part.text}
-        </span>
-      ))}
+      {t('chat.deepDiving')}
       {showClock && (
         <span className={css.turnStatusClock} aria-hidden>
           {formatRunDuration(elapsedMs, t)}
@@ -263,7 +217,7 @@ const ChatNodeList = memo(function ChatNodeList({ order, ...seatProps }: ChatNod
 export function ChatView({
   useSession, useChat, useChatNode, useChatNodeProcess, useSessions, useStore, actions, renderSlot,
   sessionId, openFile, openSkill, loadOlder, loadThrough, loadImage, openView, chatScroll, forkAt, fileMentions,
-  runningLabels, useTranscriptView, useProjection, t,
+  useTranscriptView, useProjection, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
   const nodeStore = useChat(s => s.nodes)
@@ -288,16 +242,6 @@ export function ChatView({
   const hasMore = useSession(s => s.hasMore)
   const loadingOlder = useSession(s => s.loadingOlder)
   const compactTranscript = useTranscriptView(mode => mode === 'compact')
-  // Read through the injected Conversation-owned source: the labels are already
-  // parsed and trimmed there, so this view renders them as authored.
-  const statusLabels = useSyncExternalStore(
-    useCallback(
-      (onChange: () => void) => runningLabels === undefined ? () => {} : runningLabels.subscribe(onChange),
-      [runningLabels],
-    ),
-    useCallback(() => runningLabels?.getSnapshot() ?? NO_RUNNING_LABELS, [runningLabels]),
-    () => NO_RUNNING_LABELS,
-  )
   const inspectCall = useCallback((callId: string) => {
     openView('trajectory', callId)
   }, [openView])
@@ -861,7 +805,7 @@ export function ChatView({
               double-render the same wait. */}
           {/* Turn-level loading signal: rides the whole running turn (first-token
               wait, tool execution, streaming) so it never flickers per step. */}
-          {running && <TurnStatus startTime={runningTurnStart} labels={statusLabels} t={t} />}
+          {running && <TurnStatus startTime={runningTurnStart} t={t} />}
           {pendingSteering.map(item => (
             <PendingSteeringBubble
               key={item.id}

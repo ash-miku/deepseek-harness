@@ -89,7 +89,7 @@ describe('Chat apply wiring', () => {
       .toEqual(['stats'])
     expect(b.runtime.slots.entries('settings.general.item').map(row => row.options.id))
       .toEqual([
-        'transcript-view', 'composer-enter', 'conversation-running-label',
+        'transcript-view', 'composer-enter',
         'conversation-completion-sound', 'conversation-completion-sound-volume',
       ])
     await b.runtime.dispose()

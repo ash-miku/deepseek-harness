@@ -14,7 +14,7 @@ import { CompletionSoundVolumeRow } from '../src/client/settings/CompletionSound
 import type { CompletionSoundVolumeRowProps } from '../src/client/settings/CompletionSoundVolumeRow.tsx'
 import {
   DEFAULT_COMPLETION_SOUND, DEFAULT_COMPLETION_SOUND_TONE, DEFAULT_COMPLETION_SOUND_VOLUME,
-  DEFAULT_RUNNING_LABELS, type ConversationSettings,
+  type ConversationSettings,
 } from '../src/submission-settings.ts'
 import { en } from '../src/client/locales.ts'
 
@@ -116,7 +116,6 @@ describe('CompletionSoundPreference settings compatibility', () => {
       status: 'ready',
       value: {
         busyEnter: 'queue',
-        runningLabels: DEFAULT_RUNNING_LABELS,
         completionSound: DEFAULT_COMPLETION_SOUND,
         completionSoundTone: DEFAULT_COMPLETION_SOUND_TONE,
         completionSoundVolume: DEFAULT_COMPLETION_SOUND_VOLUME,

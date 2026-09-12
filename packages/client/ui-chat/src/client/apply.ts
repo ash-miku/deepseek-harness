@@ -111,10 +111,8 @@ export function apply(ctx: Context): void {
         if (binding === undefined) throw new Error(`ui-chat: unknown session "${sessionId}"`)
         const session = binding.session
         const chat = chatSource(binding)
-        const runningLabels = ctx.get('chatRunningLabels')
         return {
           hooks: { transcriptView: transcriptView.mode },
-          ...(runningLabels === undefined ? {} : { runningLabels }),
           keyedHooks: {
             chatNode: key => chat.getSnapshot().nodes.source(key),
             chatNodeProcess: key => chat.getSnapshot().nodes.processSource(key),

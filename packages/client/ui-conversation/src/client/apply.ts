@@ -28,14 +28,11 @@ import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
 import { queueDockEntry } from './queue/QueueDock.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowInjected } from './settings/EnterBehaviorRow.tsx'
-import { RunningLabelRow } from './settings/RunningLabelRow.tsx'
-import type { RunningLabelRowInjected } from './settings/RunningLabelRow.tsx'
 import { CompletionSoundController, CompletionSoundPreference } from './completion-sound.ts'
 import { CompletionSoundRow } from './settings/CompletionSoundRow.tsx'
 import type { CompletionSoundRowInjected } from './settings/CompletionSoundRow.tsx'
 import { CompletionSoundVolumeRow } from './settings/CompletionSoundVolumeRow.tsx'
 import type { CompletionSoundVolumeRowInjected } from './settings/CompletionSoundVolumeRow.tsx'
-import { ConversationDisplayPreference } from './display-preference.ts'
 import { ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationPanel } from './skeleton/ConversationPanel.tsx'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
@@ -44,7 +41,7 @@ import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { resolveActiveView } from './view-selection.ts'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import {
-  CONVERSATION_SETTINGS_NAMESPACE, parseRunningLabels, type ConversationSettings,
+  CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings,
 } from '../submission-settings.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -93,16 +90,6 @@ const EMPTY_FILE_UPLOADS: DraftFileUploads = {}
 const ABSENT_FILE_UPLOADS = {
   getSnapshot: () => EMPTY_FILE_UPLOADS,
   subscribe: () => () => {},
-}
-
-/**
- * Structural face of the optional `chatRunningLabels` service ui-chat reads.
- * Declared here rather than imported from ui-chat: that package depends on
- * this one, so a type import back would close a dependency cycle.
- */
-interface RunningLabelsSource {
-  getSnapshot(): readonly string[]
-  subscribe(onChange: () => void): () => void
 }
 
 interface WorkspaceNavigation {
@@ -162,7 +149,6 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     namespace: CONVERSATION_SETTINGS_NAMESPACE,
   })
   const submissionPolicy = new ComposerSubmissionPolicy(conversationSettings)
-  const displayPreference = new ConversationDisplayPreference(conversationSettings)
   const completionSoundPreference = new CompletionSoundPreference(conversationSettings)
   const completionSound = new CompletionSoundController(
     completionSoundPreference.enabled, completionSoundPreference.tone, completionSoundPreference.volume,
@@ -176,27 +162,6 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     }
   }, 'ui-conversation: completion sound')
 
-  // The Chat view reads user-authored running-status labels through the
-  // optional `chatRunningLabels` service (ui-chat's off state is the built-in
-  // label). The stored value is newline-separated; the consumer takes the
-  // accepted list, so parse here and hand back one stable reference per
-  // distinct text — a fresh array on every read would defeat the consumer's
-  // snapshot-change detection.
-  let runningLabelsText = displayPreference.runningLabels.getSnapshot()
-  let runningLabelsList: readonly string[] = parseRunningLabels(runningLabelsText)
-  const chatRunningLabels: RunningLabelsSource = {
-    getSnapshot: () => runningLabelsList,
-    subscribe: onChange => displayPreference.runningLabels.subscribe(() => {
-      const next = displayPreference.runningLabels.getSnapshot()
-      if (next !== runningLabelsText) {
-        runningLabelsText = next
-        runningLabelsList = parseRunningLabels(next)
-      }
-      onChange()
-    }),
-  }
-  ctx.provide('chatRunningLabels', chatRunningLabels)
-
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
     id: 'composer-enter',
@@ -207,17 +172,6 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       setBusyEnter: (behavior) => { submissionPolicy.setBusyEnter(behavior) },
     }),
   }, EnterBehaviorRow))
-
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
-    id: 'conversation-running-label',
-    order: 30,
-    locale: NS,
-    inject: (): RunningLabelRowInjected => ({
-      hooks: { runningLabels: displayPreference.runningLabels },
-      setRunningLabels: (labels) => { displayPreference.setRunningLabels(labels) },
-    }),
-  }, RunningLabelRow))
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
