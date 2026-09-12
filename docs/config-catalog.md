@@ -359,6 +359,14 @@ export interface ConnectionConfig {
    * bind. An entry that is not a bare, canonical authority fails plugin load.
    */
   trustedHosts?: string[]
+  /**
+   * Serve every request that already passed the Host/Origin trust fence
+   * without the browser-session launch token or cookie, and print a clean URL.
+   * Intended for a deployment reached from a trusted network where opening the
+   * printed token URL on each device is impractical. The trusted-host fence
+   * still restricts which authorities are served. Default: false.
+   */
+  browserAuthDisabled?: boolean
   /** Absolute browser-session lifetime in days. Default: 30. */
   cookieMaxAgeDays?: number
   /** Maximum buffered JSON body for every `/api` request. Default: 300 MiB. */
