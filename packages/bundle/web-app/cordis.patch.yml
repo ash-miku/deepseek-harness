@@ -358,6 +358,11 @@
     - id: ui-trajectory
       name: '@deepseek-ai/dsh-client-ui-trajectory'
 
+    # Workspace Git changes tab: file list plus inline/side-by-side diff over
+    # the authenticated /api/git-changes routes.
+    - id: ui-git-changes
+      name: '@deepseek-ai/dsh-client-ui-git-changes'
+
 # ── the agent plane moves behind agent presets ─────────────────────────────
 #
 # Every row below composes what ONE agent contributes to the host registries:

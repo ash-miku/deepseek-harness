@@ -1,0 +1,345 @@
+.root {
+  /* This view owns its scrolling; the composer floats over it (see the
+     data-conversation-composer-overlay opt-in), so scrollers reserve its height. */
+  --dsh-git-bottom-clearance: calc(var(--dsh-composer-height, 152px) + 16px);
+
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  height: 100%;
+  min-height: 0;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  font: var(--dsw-font-xs-13);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  flex: none;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.fieldLabel {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 260px;
+  padding: 2px 6px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-border-l3);
+}
+
+.triggerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-caption);
+  transition: transform 120ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.branch {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.counts {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.segment {
+  display: inline-flex;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmentButton,
+.segmentActive {
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  padding: 3px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.segmentActive {
+  background: var(--dsw-alias-interactive-bg-active);
+  color: var(--dsw-alias-label-primary);
+}
+
+.refresh {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  padding: 3px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.refresh:hover,
+.segmentButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.fileList {
+  width: 280px;
+  flex: none;
+  overflow: auto;
+  border-right: 1px solid var(--dsw-alias-border-l1);
+  padding: 6px;
+  padding-bottom: var(--dsh-git-bottom-clearance);
+}
+
+.file,
+.fileActive {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.file:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.fileActive {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.badge {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.badge[data-kind='added'] { color: var(--dsw-alias-state-success-primary); }
+.badge[data-kind='untracked'] { color: var(--dsw-alias-state-success-primary); }
+.badge[data-kind='deleted'] { color: var(--dsw-alias-state-error-primary); }
+.badge[data-kind='unmerged'] { color: var(--dsw-alias-state-warn-primary); }
+.badge[data-kind='renamed'] { color: var(--dsw-alias-state-business-primary); }
+.badge[data-kind='copied'] { color: var(--dsw-alias-state-business-primary); }
+
+.filePath {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.flags {
+  flex: none;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.flagStaged {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.flagUnstaged {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.diffPane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.diffHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  flex: none;
+}
+
+.diffPath {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diffTotals {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.totalStats,
+.fileStats {
+  display: inline-flex;
+  gap: 6px;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.statAdded {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.statRemoved {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.truncated {
+  color: var(--dsw-alias-state-warn-primary);
+}
+
+.diffScroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: var(--dsh-git-bottom-clearance);
+  background: var(--dsw-alias-markdown-code-block);
+  font: var(--dsw-font-markdown-code-block);
+}
+
+/* Inline mode keeps code unwrapped and scrolls horizontally. */
+.diffRows {
+  min-width: max-content;
+}
+
+/* Split mode fits the pane: two 50% columns, long lines wrap, no h-scroll. */
+.splitRows {
+  min-width: 100%;
+}
+
+.line {
+  display: flex;
+  min-height: 20px;
+  white-space: pre;
+}
+
+.splitRow {
+  display: flex;
+  min-height: 20px;
+}
+
+.hunk {
+  color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-bg-layer-2);
+  padding: 0 8px;
+  min-height: 20px;
+  white-space: pre;
+}
+
+.lineNo {
+  flex: none;
+  width: 48px;
+  padding: 0 8px;
+  text-align: right;
+  color: var(--dsw-alias-label-tertiary);
+  user-select: none;
+}
+
+.lineText {
+  flex: 1;
+  padding-right: 12px;
+}
+
+.lineAdd,
+.splitCell.lineAdd {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 14%, transparent);
+}
+
+.lineDel,
+.splitCell.lineDel {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent);
+}
+
+.lineMeta {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.lineEmpty {
+  background: var(--dsw-alias-bg-mask-1);
+}
+
+.splitCell {
+  display: flex;
+  flex: 1 1 0;
+  width: 50%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.splitCell .lineText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.splitCell + .splitCell {
+  border-left: 1px solid var(--dsw-alias-border-l1);
+}
+
+.notice {
+  padding: 16px 14px;
+  color: var(--dsw-alias-label-tertiary);
+}

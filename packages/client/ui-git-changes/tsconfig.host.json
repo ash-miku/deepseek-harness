@@ -1,0 +1,22 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "files": [
+    "src/index.ts",
+    "src/git-contract.ts",
+    "src/git-service.ts",
+    "src/git-routes.ts"
+  ],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../connection/tsconfig.host.json" },
+    { "path": "../../api/session-controller/tsconfig.host.json" },
+    { "path": "../../session-query/session-query" },
+    { "path": "../../core/session" },
+    { "path": "../../sandbox/sandbox-policy" }
+  ]
+}
