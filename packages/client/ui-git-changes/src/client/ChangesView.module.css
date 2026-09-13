@@ -18,7 +18,7 @@
   align-items: center;
   gap: 12px;
   padding: 8px 14px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
   flex: none;
 }
 
@@ -45,7 +45,7 @@
   padding: 2px 6px;
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-bg-layer-2);
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   font: inherit;
   cursor: pointer;
@@ -92,7 +92,7 @@
 
 .segment {
   display: inline-flex;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -113,7 +113,7 @@
 }
 
 .refresh {
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
@@ -137,7 +137,7 @@
   width: 280px;
   flex: none;
   overflow: auto;
-  border-right: 1px solid var(--dsw-alias-border-l1);
+  border-right: 0.5px solid var(--dsw-alias-border-l1);
   padding: 6px;
   padding-bottom: var(--dsh-git-bottom-clearance);
 }
@@ -216,7 +216,7 @@
   align-items: center;
   gap: 12px;
   padding: 8px 14px;
-  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  border-bottom: 0.5px solid var(--dsw-alias-border-l1);
   flex: none;
 }
 
@@ -259,6 +259,10 @@
   padding-bottom: var(--dsh-git-bottom-clearance);
   background: var(--dsw-alias-markdown-code-block);
   font: var(--dsw-font-markdown-code-block);
+  /* Hunk banners inside paint the elevated l2 rung; rebind the shared thumb
+     pair so the scrollbar matches that surface (ui-theme scrollbar contract). */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 /* Inline mode keeps code unwrapped and scrolls horizontally. */
@@ -336,7 +340,7 @@
 }
 
 .splitCell + .splitCell {
-  border-left: 1px solid var(--dsw-alias-border-l1);
+  border-left: 0.5px solid var(--dsw-alias-border-l1);
 }
 
 .notice {
