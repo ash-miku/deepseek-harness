@@ -57,6 +57,7 @@ export interface GitUnavailable {
   readonly message: string
 }
 
+/** Repository status when available, or the unavailable message. */
 export type GitStatusResult = GitStatusValue | GitUnavailable
 
 /** One file's diff: unified text plus display metadata. */
