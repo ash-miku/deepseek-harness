@@ -45,8 +45,14 @@ function resolveContentWidth(columnWidth: number, preference: number | null): nu
 
 /** One transcript width handle: pointer capture + rAF-throttled symmetric
  * resize (both sides write the one centered width, so outward travel widens
- * by 2× the pointer distance). pointermove publishes the pointer's Y as a CSS
- * variable so the glow indicator rides it. Mirrors ui-layout AppFrame's
+ * by 2× the pointer distance). The strip itself is pointer-transparent so a
+ * wheel over it chains to the transcript scrollport natively — the platform's
+ * own (compositor) scrolling rather than a main-thread \`scrollTop\` write, which
+ * is what made the pass-through feel choppy. The gesture and the resize cursor
+ * therefore live on the enclosing band and hit-test the strip's box.
+ * pointermove publishes the pointer's Y as a CSS variable so the glow indicator
+ * rides it. Coarse pointers keep the strip interactive (touch-action: none)
+ * because they have no wheel to pass through. Mirrors ui-layout AppFrame's
  * DragHandle capture model. */
 function WidthHandle(props: {
   side: 'left' | 'right'
@@ -60,70 +66,133 @@ function WidthHandle(props: {
   const origin = useRef(0)
   const latest = useRef(0)
   const frame = useRef<number | null>(null)
+  const capture = useRef<{ element: HTMLElement; id: number } | null>(null)
+  const hovering = useRef(false)
   const callbacks = useRef(props)
   callbacks.current = props
+  const handleRef = useRef<HTMLDivElement | null>(null)
 
   const outwardWidth = () => {
     const dx = latest.current - origin.current
     const outward = callbacks.current.side === 'right' ? dx : -dx
     return base.current + outward * 2
   }
-  const cancelFrame = () => {
-    if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
-  }
-  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    origin.current = e.clientX
-    latest.current = e.clientX
-    base.current = callbacks.current.onStart()
-    setDragging(true)
-  }, [])
-  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const box = e.currentTarget.getBoundingClientRect()
-    e.currentTarget.style.setProperty('--dsh-width-handle-pointer-y', `${e.clientY - box.top}px`)
-    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-    latest.current = e.clientX
-    frame.current ??= requestAnimationFrame(() => {
-      frame.current = null
-      callbacks.current.onDrag(outwardWidth())
-    })
-  }, [])
-  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-    e.currentTarget.releasePointerCapture(e.pointerId)
-    cancelFrame()
-    latest.current = e.clientX
-    // Only a gesture with actual travel commits: a press-and-release on a
-    // window-clamped width must not overwrite the wider stored preference
-    // with the clamped display value.
-    if (latest.current !== origin.current) callbacks.current.onCommit(outwardWidth())
-    setDragging(false)
-    callbacks.current.onEnd()
-  }, [])
-  // Releasing the button outside the window delivers pointercancel (or drops
-  // the capture silently) instead of pointerup; without this the glow's
-  // data-dragging state sticks on. The gesture is abandoned uncommitted —
-  // onEnd republishes the stored preference. releasePointerCapture inside
-  // onPointerUp also fires lostpointercapture, so this runs (idempotently)
-  // after every normal drag end too; keep both paths.
-  const onPointerCancel = useCallback(() => {
-    cancelFrame()
-    setDragging(false)
-    callbacks.current.onEnd()
+
+  // The gesture listens on the enclosing band instead of the strip: the strip
+  // is pointer-events: none so the wheel reaches the scrollport, which also
+  // means it can own neither hover nor the resize cursor. One listener set per
+  // handle hit-tests that handle's box; only the handle whose hover state
+  // changes touches the shared band cursor.
+  useEffect(() => {
+    const handle = handleRef.current
+    /* v8 ignore next -- the ref is attached by effect time: the handle renders unconditionally. */
+    if (handle === null) return
+    const surface = handle.parentElement
+    /* v8 ignore next -- the strip always renders inside the conversation band. */
+    if (surface === null) return
+
+    const boxOf = (): DOMRect => handle.getBoundingClientRect()
+    const within = (clientX: number): boolean => {
+      const box = boxOf()
+      return clientX >= box.left && clientX <= box.right
+    }
+    const paint = (clientY: number): void => {
+      handle.style.setProperty('--dsh-width-handle-pointer-y', `${clientY - boxOf().top}px`)
+    }
+    const cancelFrame = (): void => {
+      if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
+    }
+    const setHover = (hover: boolean): void => {
+      hovering.current = hover
+      if (hover) handle.dataset.hover = ''
+      else delete handle.dataset.hover
+      surface.style.cursor = hover ? 'col-resize' : ''
+    }
+    const endDrag = (): void => {
+      const active = capture.current
+      if (active === null) return
+      capture.current = null
+      cancelFrame()
+      if (active.element.hasPointerCapture(active.id)) active.element.releasePointerCapture(active.id)
+      setDragging(false)
+      callbacks.current.onEnd()
+    }
+
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.button !== 0 || capture.current !== null || !within(event.clientX)) return
+      // Capture phase: the transparent strip lets the press fall through to the
+      // transcript, so stop it here to keep a resize from selecting text or
+      // activating the row underneath.
+      event.preventDefault()
+      event.stopPropagation()
+      surface.setPointerCapture(event.pointerId)
+      capture.current = { element: surface, id: event.pointerId }
+      origin.current = event.clientX
+      latest.current = event.clientX
+      base.current = callbacks.current.onStart()
+      setHover(true)
+      setDragging(true)
+    }
+    const onPointerMove = (event: PointerEvent): void => {
+      if (capture.current?.id === event.pointerId) {
+        paint(event.clientY)
+        latest.current = event.clientX
+        frame.current ??= requestAnimationFrame(() => {
+          frame.current = null
+          callbacks.current.onDrag(outwardWidth())
+        })
+        return
+      }
+      const inside = within(event.clientX)
+      if (inside) paint(event.clientY)
+      if (inside !== hovering.current) setHover(inside)
+    }
+    const onPointerUp = (event: PointerEvent): void => {
+      if (capture.current?.id !== event.pointerId) return
+      latest.current = event.clientX
+      // Only a gesture with actual travel commits: a press-and-release on a
+      // window-clamped width must not overwrite the wider stored preference
+      // with the clamped display value.
+      if (latest.current !== origin.current) callbacks.current.onCommit(outwardWidth())
+      endDrag()
+      // onEnd republished from storage and may have moved the strip; re-test
+      // the release point so the glow and cursor do not stick on.
+      setHover(within(event.clientX))
+    }
+    // Releasing outside the window delivers pointercancel (or drops the capture
+    // silently) instead of pointerup; endDrag abandons the gesture uncommitted
+    // and onEnd republishes the stored preference.
+    const onPointerCancel = (event: PointerEvent): void => {
+      if (capture.current?.id !== event.pointerId) return
+      endDrag()
+      setHover(within(event.clientX))
+    }
+    const onPointerLeave = (): void => {
+      if (capture.current === null && hovering.current) setHover(false)
+    }
+
+    surface.addEventListener('pointerdown', onPointerDown, true)
+    surface.addEventListener('pointermove', onPointerMove)
+    surface.addEventListener('pointerup', onPointerUp)
+    surface.addEventListener('pointercancel', onPointerCancel)
+    surface.addEventListener('pointerleave', onPointerLeave)
+    return () => {
+      surface.removeEventListener('pointerdown', onPointerDown, true)
+      surface.removeEventListener('pointermove', onPointerMove)
+      surface.removeEventListener('pointerup', onPointerUp)
+      surface.removeEventListener('pointercancel', onPointerCancel)
+      surface.removeEventListener('pointerleave', onPointerLeave)
+      surface.style.cursor = ''
+    }
   }, [])
 
   return (
     <div
+      ref={handleRef}
       className={css.widthHandle}
       data-side={props.side}
       data-width-handle={props.side}
       data-dragging={dragging || undefined}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      onLostPointerCapture={onPointerCancel}
     />
   )
 }

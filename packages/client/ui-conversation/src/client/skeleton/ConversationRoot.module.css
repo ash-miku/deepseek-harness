@@ -233,6 +233,11 @@
     calc((100% - var(--dsh-chat-content-width)) / 2 - 24px - 24px)
   );
   cursor: col-resize;
+  /* The strip is a visual layer only: pointer-transparent so the wheel chains
+     to the transcript scrollport and keeps the platform's native scrolling.
+     The gesture and cursor live on the enclosing band (ConversationRoot
+     WidthHandle), hit-tested against this box. */
+  pointer-events: none;
 }
 
 .widthHandle[data-side='left'] {
@@ -278,9 +283,16 @@
   left: 16px;
 }
 
-.widthHandle:hover::after,
+.widthHandle[data-hover]::after,
 .widthHandle[data-dragging]::after {
   opacity: 1;
+}
+
+/* Coarse pointers have no wheel to pass through, so the strip itself stays the
+   hit target there (keeping its touch-action: none); the band listeners then
+   only start gestures that land on it. */
+@media (pointer: coarse) {
+  .widthHandle { pointer-events: auto; }
 }
 
 /* Views that elect a composer overlay (trajectory etc.) own their full-bleed

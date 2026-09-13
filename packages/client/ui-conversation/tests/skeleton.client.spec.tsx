@@ -639,6 +639,12 @@ describe('ConversationRoot resident composer', () => {
     act(() => { fireResize(root) })
     const handle = b.view.container.querySelector('[data-width-handle="right"]') as HTMLElement
     expect(handle).not.toBeNull()
+    // jsdom has no layout: give the strip a box containing the drag's x so the
+    // band listener's hit-test admits the gesture.
+    handle.getBoundingClientRect = () => ({
+      left: 760, right: 840, top: 0, bottom: 400, width: 80, height: 400, x: 760, y: 0,
+      toJSON: () => ({}),
+    })
     // jsdom lacks pointer capture: emulate per-element so hasPointerCapture
     // gates pass; the finally block restores the original descriptors so the
     // stubs cannot leak into later tests.
@@ -679,6 +685,32 @@ describe('ConversationRoot resident composer', () => {
         else Object.defineProperty(Element.prototype, name, descriptor)
       }
     }
+  })
+
+  it('delegates the strip gesture to the band: hover feedback, and no drag off the strip', () => {
+    const b = mount(sessionSnapshotOf())
+    const handle = b.view.container.querySelector<HTMLElement>('[data-width-handle="left"]')
+    expect(handle).not.toBeNull()
+    if (handle === null) throw new Error('expected a width handle')
+    const surface = handle.parentElement as HTMLElement
+    handle.getBoundingClientRect = () => ({
+      left: 120, right: 160, top: 40, bottom: 400, width: 40, height: 360, x: 120, y: 40,
+      toJSON: () => ({}),
+    })
+    // Inside the strip: the transparent handle gets the hover glow and the band
+    // carries the resize cursor (the strip itself cannot own either).
+    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 140, clientY: 200 })
+    expect(handle.dataset.hover).toBe('')
+    expect(surface.style.cursor).toBe('col-resize')
+    expect(handle.style.getPropertyValue('--dsh-width-handle-pointer-y')).toBe('160px')
+    // Off the strip: both clear.
+    fireEvent.pointerMove(handle, { pointerId: 7, clientX: 400, clientY: 200 })
+    expect(handle.dataset.hover).toBeUndefined()
+    expect(surface.style.cursor).toBe('')
+    // A press off the strip never starts a resize.
+    fireEvent.pointerDown(handle, { pointerId: 7, clientX: 400, clientY: 200 })
+    expect(handle.dataset.dragging).toBeUndefined()
+    expect(localStorage.getItem('dsh.conversation.contentWidth')).toBeNull()
   })
 
   it('hero phase renders no width handles (no transcript to size)', () => {
