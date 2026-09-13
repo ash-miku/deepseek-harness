@@ -1,5 +1,6 @@
 /** Browser wire client: Remote transport and connection generations. */
 import type { Context } from '@deepseek-ai/cordis'
+import { installBrowserCompat } from './browser-compat.ts'
 import {
   ConnectionController,
   type ConnectionRecoveryConfig,
@@ -13,6 +14,10 @@ import { createWebConnectionRpc, type RpcFetch, type RpcStreamOpen } from './rpc
 import { isLoopbackHostname } from '../loopback-hostname.ts'
 import type { ClientConnectionRpc } from '../rpc.ts'
 import { resolveConnectionConfig } from '../recovery-config.ts'
+
+// The transport root installs the shared browser shim before any dependent
+// bundle performs its first fused-signal read.
+installBrowserCompat()
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
