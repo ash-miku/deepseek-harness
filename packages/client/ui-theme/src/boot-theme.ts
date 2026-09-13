@@ -31,6 +31,7 @@ function bootThemeScript(preference: ThemePreference, fontSize: number, fontWeig
  * the opening body tag, before the shell mount and module script.
  * @param preference - Current Host-backed built-in preference.
  * @param fontSize - Current Host-backed content font size in px.
+ * @param fontWeight - Current Host-backed content font weight.
  * @returns the body script row.
  */
 export function bootThemeInjection(
