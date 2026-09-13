@@ -154,18 +154,22 @@ body[data-ds-dark-theme] {
 }
 
 body {
-  --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-00);
-  --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-00);
-  --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-00);
-  --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-00);
+  /* Reading canvas: a near-white #F9F9F9 ground replaces pure white, so the
+     workspace no longer sits at the top of the luminance range. The raised
+     rungs stay white and read as lifted against it; most of the contrast
+     relief comes from the lifted label rung below. */
+  --dsw-alias-bg-base: #ffffff;
+  --dsw-alias-bg-layer-1: rgb(255, 255, 255);
+  --dsw-alias-bg-layer-2: rgb(255, 255, 255);
+  --dsw-alias-bg-layer-3: rgb(255, 255, 255);
   --dsw-alias-bg-mask-1: rgba(0, 0, 0, 0.24);
   --dsw-alias-bg-mask-2: rgba(0, 0, 0, 0.12);
   --dsw-alias-bg-mask-3: rgba(0, 0, 0, 0.48);
   --dsw-alias-bg-mask-photo: rgba(0, 0, 0, 0.88);
   --dsw-alias-bg-mask-drop: rgba(255, 255, 255, 0.7);
-  --dsw-alias-bg-module-platform: var(--dsw-static-neutral-bluish-60);
-  --dsw-alias-bg-multi-select: var(--dsw-static-neutral-bluish-60);
-  --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-150);
+  --dsw-alias-bg-module-platform: #eef4f9;
+  --dsw-alias-bg-multi-select: #e2e9ed;
+  --dsw-alias-bg-overlay: #eef4f9;
   --dsw-alias-bg-skeleton: rgba(0, 0, 0, 0.04);
   --dsw-alias-border-inverted2: rgba(0, 0, 0, 0);
   --dsw-alias-border-inverted: rgba(0, 0, 0, 0);
@@ -174,10 +178,10 @@ body {
   --dsw-alias-border-l2: rgba(0, 0, 0, 0.1);
   --dsw-alias-border-l3: rgba(0, 0, 0, 0.12);
   --dsw-alias-border-l4: rgba(0, 0, 0, 0.16);
-  --dsw-alias-brand-primary-invert: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-brand-primary-invert: #3a83f7;
   --dsw-alias-brand-primary-new-colorprimary-new-color: rgb(65, 118, 230);
-  --dsw-alias-brand-primary: var(--dsw-static-neutral-bluish-1000);
-  --dsw-alias-brand-text: var(--dsw-static-neutral-bluish-1000);
+  --dsw-alias-brand-primary: #3a83f7;
+  --dsw-alias-brand-text: #3a83f7;
   --dsw-alias-button-contrast-fill: var(--dsw-static-neutral-bluish-700);
   --dsw-alias-button-elevated-fill: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-button-floating-fill: var(--dsw-static-neutral-bluish-00);
@@ -189,7 +193,7 @@ body {
   --dsw-alias-button-info-hover: var(--dsw-static-deepseek-400);
   --dsw-alias-button-primary-dimmed: var(--dsw-static-neutral-bluish-100);
   --dsw-alias-button-primary-fill: var(--dsw-alias-brand-primary);
-  --dsw-alias-button-primary-hover: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-button-primary-hover: #2f6fd8;
   --dsw-alias-button-tool-bar-fill-invisible: rgba(31, 31, 31, 0.36);
   --dsw-alias-button-tool-bar-fill: rgba(84, 85, 87, 0.5);
   --dsw-alias-button-tool-bar-hover: rgba(84, 85, 87, 0.6);
@@ -198,22 +202,22 @@ body {
   --dsw-alias-interactive-bg-hover-danger: rgba(236, 19, 19, 0.05);
   --dsw-alias-interactive-bg-hover-solid: var(--dsw-static-neutral-bluish-75);
   --dsw-alias-interactive-bg-hover: rgba(38, 49, 72, 0.06);
-  --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-400);
+  --dsw-alias-label-caption: #aab0b5;
   --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-200);
   --dsw-alias-label-primary-bluish: var(--dsw-static-blue-900);
   --dsw-alias-label-primary-dimmed: var(--dsw-static-neutral-bluish-950);
   --dsw-alias-label-primary-foreground: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-label-primary-inverted: var(--dsw-static-neutral-bluish-00);
-  --dsw-alias-label-primary: var(--dsw-static-neutral-bluish-1000);
-  --dsw-alias-label-secondary: var(--dsw-static-neutral-bluish-700);
-  --dsw-alias-label-tertiary: var(--dsw-static-neutral-bluish-600);
-  --dsw-alias-link: var(--dsw-static-deepseek-500);
-  --dsw-alias-markdown-citation: var(--dsw-static-neutral-bluish-100);
-  --dsw-alias-markdown-code-block-banner: var(--dsw-static-neutral-bluish-50);
-  --dsw-alias-markdown-code-block: var(--dsw-static-neutral-bluish-50);
+  --dsw-alias-label-primary: #1a1c1f;
+  --dsw-alias-label-secondary: #85898d;
+  --dsw-alias-label-tertiary: #9aa0a6;
+  --dsw-alias-link: #3a83f7;
+  --dsw-alias-markdown-citation: #eef4f9;
+  --dsw-alias-markdown-code-block-banner: #e9eaea;
+  --dsw-alias-markdown-code-block: #f6f7f8;
   --dsw-alias-markdown-code-segment-selected: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-markdown-code-segment-unselected: var(--dsw-static-neutral-bluish-75);
-  --dsw-alias-markdown-inline-code: var(--dsw-static-neutral-50);
+  --dsw-alias-markdown-inline-code: #e9eaea;
   --dsw-alias-markdown-placeholder: var(--dsw-static-neutral-bluish-60);
   --dsw-alias-markdown-tag: var(--dsw-static-neutral-bluish-75);
   --dsw-alias-scrollbar-bg-l1: var(--dsw-static-neutral-200);
@@ -224,22 +228,22 @@ body {
   --dsw-alias-state-business-tertiary: var(--dsw-static-deepseek-100);
   --dsw-alias-state-error-primary: var(--dsw-static-red-600);
   --dsw-alias-state-error-secondary: var(--dsw-static-red-400);
-  --dsw-alias-state-success-primary: var(--dsw-static-green-500);
-  --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
-  --dsw-alias-state-success-tertiary: var(--dsw-static-green-100);
+  --dsw-alias-state-success-primary: #00a240;
+  --dsw-alias-state-success-secondary: #35b45f;
+  --dsw-alias-state-success-tertiary: #dcf3e4;
   --dsw-alias-state-warn-label: var(--dsw-static-amber-600);
   --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-100);
   --dsw-alias-toast-bg: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-850);
-  --dsw-specific-bubble-highlight: var(--dsw-static-deepseek-200);
-  --dsw-specific-bubble: var(--dsw-static-deepseek-50);
+  --dsw-specific-bubble-highlight: #d2e6fc;
+  --dsw-specific-bubble: #e8f3fe;
   --dsw-specific-input-major: var(--dsw-static-neutral-bluish-00);
   --dsw-specific-login-input: var(--dsw-static-neutral-bluish-50);
   --dsw-specific-menu: var(--dsw-alias-bg-layer-3);
-  --dsw-specific-selector: var(--dsw-static-neutral-bluish-60);
-  --dsw-specific-sidebar-fill: var(--dsw-static-neutral-bluish-50);
+  --dsw-specific-selector: #eef4f9;
+  --dsw-specific-sidebar-fill: #eef4f9;
   --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-deepseek-100);
   --dsw-specific-sidebar-nav-item-active: var(--dsw-static-neutral-bluish-100);
   --dsw-specific-sidebar-nav-item-hover: var(--dsw-static-neutral-bluish-75);
@@ -247,7 +251,9 @@ body {
 }
 
 body[data-ds-dark-theme] {
-  --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-950);
+  /* Dark keeps its elevation ladder untouched: only the ground lifts off the
+     floor and the top label dims, so white text no longer blooms at ~17.6:1. */
+  --dsw-alias-bg-base: rgb(29, 30, 33);
   --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-875);
   --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-850);
   --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-800);
@@ -291,15 +297,15 @@ body[data-ds-dark-theme] {
   --dsw-alias-interactive-bg-hover-danger: rgba(242, 90, 90, 0.15);
   --dsw-alias-interactive-bg-hover-solid: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-interactive-bg-hover: rgba(255, 255, 255, 0.08);
-  --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-600);
+  --dsw-alias-label-caption: rgb(132, 137, 144);
   --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-750);
   --dsw-alias-label-primary-bluish: var(--dsw-static-neutral-bluish-50);
   --dsw-alias-label-primary-dimmed: var(--dsw-static-neutral-bluish-100);
   --dsw-alias-label-primary-foreground: var(--dsw-static-neutral-bluish-1000);
   --dsw-alias-label-primary-inverted: var(--dsw-static-neutral-bluish-800);
-  --dsw-alias-label-primary: var(--dsw-static-neutral-bluish-50);
-  --dsw-alias-label-secondary: var(--dsw-static-neutral-bluish-300);
-  --dsw-alias-label-tertiary: var(--dsw-static-neutral-bluish-400);
+  --dsw-alias-label-primary: rgb(214, 217, 222);
+  --dsw-alias-label-secondary: rgb(168, 173, 181);
+  --dsw-alias-label-tertiary: rgb(146, 151, 159);
   --dsw-alias-link: var(--dsw-static-deepseek-400);
   --dsw-alias-markdown-citation: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-markdown-code-block-banner: var(--dsw-static-neutral-bluish-850);
@@ -337,4 +343,69 @@ body[data-ds-dark-theme] {
   --dsw-specific-sidebar-nav-item-active: var(--dsw-static-neutral-bluish-750);
   --dsw-specific-sidebar-nav-item-hover: var(--dsw-static-neutral-bluish-850);
   --dsw-specific-tip: var(--dsw-static-neutral-bluish-800);
+}
+
+/* --- Codex dark palette (official) --------------------------------------
+   Sampled from the official Codex dark UI: a neutral #181818 content canvas
+   with a blue-tinted #1b2126 chrome, pure-white prose, #242424 / #2a2a2a /
+   #303030 surfaces, a #173e76 user bubble, and a #2c67c5 blue accent.
+   Markdown stays monochrome. Rebinding the ramp feeds every surface, border,
+   and scrollbar. */
+body[data-ds-dark-theme] {
+  --dsw-static-neutral-bluish-950: #181818;
+  --dsw-static-neutral-bluish-900: #1b2126;
+  --dsw-static-neutral-bluish-875: #242424;
+  --dsw-static-neutral-bluish-850: #2a2a2a;
+  --dsw-static-neutral-bluish-800: #303030;
+  --dsw-static-neutral-bluish-750: #3a3a3a;
+  --dsw-static-neutral-bluish-700: #464646;
+  --dsw-static-neutral-bluish-600: #5a5a5a;
+  --dsw-static-neutral-bluish-500: #6c6c6c;
+  --dsw-static-neutral-bluish-400: #8b8b8b;
+  --dsw-static-neutral-bluish-300: #a5a5a5;
+  --dsw-static-neutral-bluish-200: #c2c2c2;
+  --dsw-static-neutral-bluish-100: #e0e0e0;
+  --dsw-static-neutral-bluish-75: #f3f3f3;
+  --dsw-static-neutral-bluish-50: #ffffff;
+  --dsw-static-neutral-850: #252525;
+  --dsw-static-neutral-700: #464646;
+  --dsw-static-neutral-600: #5a5a5a;
+  --dsw-static-neutral-550: #6c6c6c;
+  --dsw-alias-bg-base: #181818;
+  --dsw-alias-bg-overlay: #2a2a2a;
+  --dsw-alias-border-l2: #2d343b;
+  --dsw-alias-border-l3: #464646;
+  --dsw-alias-border-l4: #5a5a5a;
+  --dsw-alias-brand-primary: #2c67c5;
+  --dsw-alias-brand-text: #2c67c5;
+  --dsw-alias-brand-primary-invert: #2c67c5;
+  --dsw-alias-button-primary-hover: #3a7ce0;
+  --dsw-alias-label-primary: #ffffff;
+  --dsw-alias-label-primary-foreground: #ffffff;
+  --dsw-alias-label-secondary: #8b8b8b;
+  --dsw-alias-label-tertiary: #6c6c6c;
+  --dsw-alias-label-caption: #5a5a5a;
+  --dsw-alias-link: #4c8df6;
+  --dsw-alias-markdown-code-block: #1e1e1e;
+  --dsw-alias-markdown-code-block-banner: #242424;
+  --dsw-alias-markdown-inline-code: #303030;
+  --dsw-alias-markdown-citation: #242424;
+  --dsw-alias-markdown-placeholder: #242424;
+  --dsw-alias-markdown-tag: #242424;
+  --dsw-alias-state-business-primary: #4c8df6;
+  --dsw-alias-state-business-tertiary: #173e76;
+  --dsw-alias-state-error-primary: #e5534b;
+  --dsw-alias-state-error-secondary: #e5534b;
+  --dsw-alias-state-success-primary: #40c977;
+  --dsw-alias-state-success-secondary: #40c977;
+  --dsw-alias-state-success-tertiary: #123a24;
+  --dsw-alias-state-warn-label: #f0c480;
+  --dsw-alias-state-warn-primary: #f0c480;
+  --dsw-alias-state-warn-secondary: #f0c480;
+  --dsw-alias-state-warn-tertiary: #3a2f1c;
+  --dsw-alias-toast-bg: #303030;
+  --dsw-alias-tooltip-bg: #303030;
+  --dsw-specific-bubble: #173e76;
+  --dsw-specific-bubble-highlight: #1f4d8f;
+  --dsw-specific-sidebar-fill: #1b2126;
 }

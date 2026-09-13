@@ -3,21 +3,17 @@
    intentionally absent (no matching DOM). Token names match that sheet. */
 
 /* Colored copy (headings, bold, inline code, quotes) reads its accent through
-   a mode-aware blend. Light is the default: each signal token is darkened
-   against the static black token rather than the light background. Scaling a
-   color toward pure black lowers its lightness while preserving its hue's
-   saturation, so the accent stays clearly colored instead of graying out;
-   blending toward the near-white surface is what made the raw accents glare.
-   Experiment: light mode borrows the dark palette's exact accent rendering —
-   the same 84/84/82/78 mixes over the dark base surface. Both schemes then
-   paint identical accent colors; the dark override below still owns the dark
-   side so the two can diverge again from one place. */
+   a mode-aware blend. Light follows the Codex-reference monochrome prose:
+   headings and bold reuse the body ink, inline code is neutral ink on the gray
+   chip surface, quotes recede to gray, and only links and success states carry
+   the blue/green accents. The dark override below keeps opencode's colored
+   roles instead. */
 .markdown {
-  --dsh-markdown-heading: color-mix(in srgb, var(--dsw-static-deepseek-400) 84%, var(--dsw-static-neutral-bluish-950));
-  --dsh-markdown-strong: color-mix(in srgb, var(--dsw-static-amber-500) 84%, var(--dsw-static-neutral-bluish-950));
-  --dsh-markdown-inline-code: color-mix(in srgb, var(--dsw-static-green-500) 82%, var(--dsw-static-neutral-bluish-950));
-  --dsh-markdown-quote: color-mix(in srgb, var(--dsw-static-amber-500) 78%, var(--dsw-static-neutral-bluish-950));
-  --dsh-markdown-marker: var(--dsh-markdown-heading);
+  --dsh-markdown-heading: #1a1c1f;
+  --dsh-markdown-strong: #1a1c1f;
+  --dsh-markdown-inline-code: #1a1c1f;
+  --dsh-markdown-quote: #5f6368;
+  --dsh-markdown-marker: #85898d;
   min-width: 0;
   overflow-wrap: anywhere;
   font: var(--dsw-font-markdown-base);
@@ -27,15 +23,14 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* Dark keeps the original vivid-on-dark blend: on the near-black surface the
-   signal tokens stay legible and only a touch of the background is needed to
-   seat them, so the light-mode ratios above must not leak into it. */
+/* Dark keeps the same monochrome prose as light: headings, bold, and inline
+   code reuse the pure-white body ink, and quotes recede to gray. */
 :global(body[data-ds-dark-theme]) .markdown {
-  --dsh-markdown-heading: color-mix(in srgb, var(--dsw-alias-state-business-primary) 84%, var(--dsw-alias-bg-base));
-  --dsh-markdown-strong: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 84%, var(--dsw-alias-bg-base));
-  --dsh-markdown-inline-code: color-mix(in srgb, var(--dsw-alias-state-success-primary) 82%, var(--dsw-alias-bg-base));
-  --dsh-markdown-quote: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 78%, var(--dsw-alias-bg-base));
-  --dsh-markdown-marker: var(--dsw-alias-state-business-primary);
+  --dsh-markdown-heading: #ffffff;
+  --dsh-markdown-strong: #ffffff;
+  --dsh-markdown-inline-code: #ffffff;
+  --dsh-markdown-quote: #a5a5a5;
+  --dsh-markdown-marker: #8b8b8b;
 }
 
 .markdown strong {
@@ -103,7 +98,10 @@
      keeps design-platform brand-text as near-black, so links use the
      dedicated link alias instead. */
   color: var(--dsw-alias-link);
-  font-weight: 500;
+  /* Inherit the surrounding weight: a plain link then matches body prose, and a
+     URL promoted inside an inline-code chip matches that chip's bold code ink
+     (an explicit 500 here made the chip's link read lighter than its code). */
+  font-weight: inherit;
   transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
   position: relative;
   text-decoration: none;
@@ -353,7 +351,7 @@
   border: none;
   background: none;
   font: inherit;
-  font-weight: 500;
+  font-weight: inherit;
   color: var(--dsw-alias-link);
   text-decoration: none;
   cursor: pointer;
