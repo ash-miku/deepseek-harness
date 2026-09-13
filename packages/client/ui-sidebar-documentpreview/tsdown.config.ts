@@ -37,6 +37,31 @@ function pdfAssets(): string {
   )])))
 }
 
+/**
+ * PDF.js 6.3.289 probes its `Iterator.prototype.join` polyfill with
+ * `typeof Iterator.prototype.join`, which dereferences the `Iterator` global.
+ * Engines without the ES2025 iterator helpers (older mobile Safari and Chrome)
+ * have no such global, so that probe throws `ReferenceError: Iterator is not
+ * defined` while the client bundle initializes, surfacing as "failed to import
+ * loader entry ...". Guard the dereference on the runtime and the embedded
+ * worker, keeping the polyfill on engines that do have `Iterator`.
+ */
+const PDF_ITERATOR_PROBE = /(?:typeof Iterator\.prototype\.join\s*!==?\s*"function"|"function"\s*!==?\s*typeof Iterator\.prototype\.join)/g
+
+/** Rewrite PDF.js's unsafe iterator-helper probe. @throws when the pinned PDF.js no longer carries it. */
+function guardPdfIteratorProbe(source: string, origin: string): string {
+  if ((source.match(PDF_ITERATOR_PROBE) ?? []).length === 0) {
+    throw new Error(
+      `pdf iterator guard: ${origin} does not contain PDF.js's iterator-helper probe; `
+      + 're-check the guard against the pinned pdfjs-dist',
+    )
+  }
+  return source.replace(PDF_ITERATOR_PROBE, probe => `typeof Iterator !== "undefined" && (${probe})`)
+}
+
+/** PDF.js main runtime module, whose top-level probe runs while the client bundle initializes. */
+const pdfRuntimeModule = /[/\\]pdfjs-dist[/\\]build[/\\]pdf\.mjs$/
+
 /** The dynamic client factory has no module URL from which to resolve a Worker file. */
 const pdfWorker: NonNullable<UserConfig['plugins']> = [{
   name: 'dsh-pdf-worker-source',
@@ -47,7 +72,16 @@ const pdfWorker: NonNullable<UserConfig['plugins']> = [{
     if (id !== workerModule) return null
     const path = require.resolve('pdfjs-dist/build/pdf.worker.min.mjs')
     this.addWatchFile(path)
-    return `export default ${JSON.stringify(readFileSync(path, 'utf8'))};`
+    return `export default ${JSON.stringify(guardPdfIteratorProbe(readFileSync(path, 'utf8'), path))};`
+  },
+}]
+
+/** Guard the main PDF.js runtime probe, which is inlined as an ordinary module. */
+const pdfIteratorGuard: NonNullable<UserConfig['plugins']> = [{
+  name: 'dsh-pdf-iterator-guard',
+  transform(code, id) {
+    if (!pdfRuntimeModule.test(id)) return null
+    return { code: guardPdfIteratorProbe(code, id), map: null }
   },
 }]
 
@@ -55,7 +89,7 @@ export default (options: Parameters<typeof bundle>[0]): UserConfig[] => bundle(o
   config.name?.endsWith('/client') === true ? {
     ...config,
     banner: pdfLicenseBanner(),
-    plugins: [config.plugins, pdfWorker],
+    plugins: [config.plugins, pdfWorker, pdfIteratorGuard],
     define: { ...config.define, __DSH_PDFJS_ASSETS__: pdfAssets() },
   } : config,
 )
