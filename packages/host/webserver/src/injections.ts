@@ -81,9 +81,10 @@ function splice(html: string, at: number, markup: string): string {
  * Whichever side runs first creates the deferred (`??=`), so a bootstrap that
  * applies the table asynchronously installs it ahead of the entry module and
  * settles it after the last row; the served form below creates and resolves
- * it in one statement, because every row is already in the document text.
+ * it in one statement, because every row is already in the document text, and
+ * avoids `Promise.withResolvers` (absent on older mobile engines).
  */
-const READY_MARKUP = '<script>(globalThis.__DSH_BOOT_READY__ ??= Promise.withResolvers()).resolve()</script>'
+const READY_MARKUP = '<script>(globalThis.__DSH_BOOT_READY__ ??= { promise: Promise.resolve(), resolve: () => {} }).resolve()</script>'
 
 /**
  * Render rows into an index.html body: head rows immediately after the
