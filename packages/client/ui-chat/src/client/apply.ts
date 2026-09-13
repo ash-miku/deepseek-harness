@@ -168,9 +168,10 @@ export function apply(ctx: Context): void {
     return disposeView
   })
 
-  ctx.slots.inject('conversation.composer.dock', () =>
+  ctx.slots.inject('conversation.composer.dock.content', () =>
     ctx.slots.register({
-      name: 'conversation.composer.dock', id: 'stats', order: 0, locale: NS,
+      name: 'conversation.composer.dock.content', id: 'stats', order: 0, locale: NS,
+      children: { 'conversation.composer.dock.stats': { kind: 'list', scope: 'session' } },
     }, StatsPills))
 
   ctx.slots.inject('conversation.approval.detail', () =>

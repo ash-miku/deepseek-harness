@@ -13,6 +13,7 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../locale" },
+    { "path": "../ui-chat" },
     { "path": "../ui-conversation" },
     { "path": "../ui-primitives" },
     { "path": "../ui-renderer" },

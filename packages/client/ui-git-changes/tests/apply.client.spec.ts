@@ -17,7 +17,7 @@ describe('changes client plugin', () => {
 
     expect(inject).toEqual(['slots', 'locale'])
     expect(locale.register).toHaveBeenCalledTimes(1)
-    expect(registrations).toHaveLength(1)
+    expect(registrations).toHaveLength(2)
     const { options, component } = registrations[0]!
     expect(options).toMatchObject({ name: 'conversation.view', id: 'changes', order: 20, locale: 'changes' })
     expect((options.label as () => string)()).toBe('view.changes')

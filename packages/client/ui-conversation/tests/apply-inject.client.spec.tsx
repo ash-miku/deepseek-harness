@@ -194,6 +194,14 @@ describe('Conversation inject API', () => {
     header.injected.selectView('chat')
     expect(activate).toHaveBeenLastCalledWith('chat')
     expect(header.instance.store.getSnapshot().view).toBe('chat')
+    const dockEntry = b.runtime.slots.entries('conversation.composer.dock')[0]!
+    const dockInstance = b.runtime.storeOf('conversation.composer.dock', ROOT) as ConversationInstance
+    const injectDock = dockEntry.inject as (id: SessionId, actions: ConversationActions) => { selectView(view: string): void }
+    const dock = injectDock(ROOT, dockInstance.actions)
+    dock.selectView('trajectory')
+    expect(activate).toHaveBeenLastCalledWith('trajectory')
+    expect(header.instance.store.getSnapshot().view).toBe('trajectory')
+    expect(body.instance.store.getSnapshot().view).toBe('trajectory')
 
     removeTrajectory()
     removeChat()

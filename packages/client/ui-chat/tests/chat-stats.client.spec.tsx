@@ -145,7 +145,10 @@ describe('StatsPills', () => {
     source: { getSnapshot(): ChatSnapshot; subscribe(fn: () => void): () => void },
     values: Record<string, unknown> = { tokenUsage: USAGE },
   ): StatsPillsProps {
-    return { useChat: bindSnapshotSelector(source), useProjection: projections(values), t: tEn }
+    return {
+      useChat: bindSnapshotSelector(source), useProjection: projections(values),
+      t: tEn, selectView: () => {}, renderSlot: () => null,
+    }
   }
 
   function tokenUsage(cacheReadTokens: number, uncachedInputTokens: number) {

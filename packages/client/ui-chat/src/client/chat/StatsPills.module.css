@@ -5,6 +5,7 @@
 .root {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 12px;
   max-width: var(--dsh-chat-content-width);
   width: 100%;
@@ -13,6 +14,10 @@
   padding: 4px calc(var(--dsh-composer-side-clearance) + 16px) 0px;
   font-size: var(--dsh-content-font-size-secondary, 13px);
   line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+}
+
+.root:not(:has(> *)) {
+  display: none;
 }
 
 /* Dialog anchor: shrink-wraps its pill so the panel clamp measures the pill. */

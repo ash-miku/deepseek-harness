@@ -8,6 +8,8 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
+import { GitChangesStats } from './GitChangesStats.tsx'
 import { GitChangesView } from './GitChangesView.tsx'
 import { en, NS, zh, type ChangesKey } from './locales.ts'
 
@@ -35,4 +37,7 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     label: () => t('view.changes'),
   }, GitChangesView))
+  ctx.slots.inject('conversation.composer.dock.stats', () => ctx.slots.register({
+    name: 'conversation.composer.dock.stats', id: 'git-changes', order: 20, locale: NS,
+  }, GitChangesStats))
 }

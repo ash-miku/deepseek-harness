@@ -1,4 +1,5 @@
 /** Authenticated Host routes answering Git changes for one Session workspace. */
+import { devNull } from 'node:os'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-client-connection'
@@ -173,7 +174,11 @@ async function statusFor(ctx: Context, query: URLSearchParams, signal: AbortSign
   if (base === '') {
     const porcelain = await git(repo.root, ['status', '--porcelain=v1', '-z', '--untracked-files=all'], signal)
     changes = parseStatusZ(porcelain.stdout)
-    const numstat = await git(repo.root, ['diff', 'HEAD', '--numstat', '-z'], signal)
+    const head = await git(repo.root, ['rev-parse', '--verify', 'HEAD'], signal)
+    const baseTree = head.code === 0 ? 'HEAD'
+      : (await git(repo.root, ['hash-object', '-t', 'tree', devNull], signal)).stdout.trim()
+    const numstat = await git(repo.root, ['diff', baseTree, '--numstat', '-z', '--no-ext-diff', '--no-textconv'], signal)
+    if (porcelain.code !== 0 || numstat.code !== 0) return new Response('Git status unavailable.', { status: 503 })
     applyNumstat(changes, numstat.stdout)
   } else {
     const named = await git(repo.root, ['diff', '--name-status', '-z', base], signal)
@@ -184,6 +189,15 @@ async function statusFor(ctx: Context, query: URLSearchParams, signal: AbortSign
     for (const path of others.stdout.split('\0')) {
       if (path !== '') changes.push({ path, kind: 'untracked', staged: false, unstaged: true })
     }
+  }
+  for (let index = 0; index < changes.length; index += 1) {
+    const change = changes[index]
+    if (change === undefined || change.kind !== 'untracked') continue
+    const result = await git(repo.root, ['diff', '--no-index', '--numstat', '-z', '--no-ext-diff', '--no-textconv', '--', devNull, change.path], signal)
+    if (signal.aborted) throw signal.reason
+    if (result.code > 1) continue
+    const counts = parseNumstatZ(result.stdout).values().next().value
+    if (counts !== undefined) changes[index] = { ...change, ...counts }
   }
   changes.sort((left, right) => left.path.localeCompare(right.path))
   const value: GitStatusResult = {

@@ -75,6 +75,33 @@ describe('git changes routes', () => {
   })
   afterEach(async () => { await rm(root, { recursive: true, force: true }) })
 
+  it('counts staged and unstaged edits once and counts new text without binary lines', async () => {
+    await run('git', ['-C', root, 'add', 'a.txt'])
+    await writeFile(join(root, 'a.txt'), 'one\nthree\nfour\n')
+    await writeFile(join(root, 'b.txt'), 'new\nlast')
+    await writeFile(join(root, 'empty.txt'), '')
+    await writeFile(join(root, 'binary.bin'), Buffer.from([0, 1, 2]))
+    const route = routeFixture(root).get(GIT_STATUS_PATH)!
+    const result = await (await route.fetch(new Request(`http://localhost${GIT_STATUS_PATH}?sessionId=owner`))).json()
+    expect(result.changes).toEqual([
+      expect.objectContaining({ path: 'a.txt', staged: true, unstaged: true, additions: 2, deletions: 0 }),
+      expect.objectContaining({ path: 'b.txt', additions: 2, deletions: 0 }),
+      { path: 'binary.bin', kind: 'untracked', staged: false, unstaged: true },
+      expect.objectContaining({ path: 'empty.txt' }),
+    ])
+  })
+
+  it('counts working-tree text before the first commit', async () => {
+    await run('git', ['-C', root, 'checkout', '--orphan', 'unborn'])
+    await run('git', ['-C', root, 'add', 'a.txt'])
+    await writeFile(join(root, 'a.txt'), 'one\ntwo\nthree\n')
+    const route = routeFixture(root).get(GIT_STATUS_PATH)!
+    const response = await route.fetch(new Request(`http://localhost${GIT_STATUS_PATH}?sessionId=owner`))
+    expect(response.status).toBe(200)
+    const result = await response.json()
+    expect(result.changes).toContainEqual(expect.objectContaining({ path: 'a.txt', additions: 3, deletions: 0 }))
+  })
+
   it('reports the repository, its changes, and an untracked diff', async () => {
     const routes = routeFixture(root)
     const statusFetch = routes.get(GIT_STATUS_PATH)
@@ -88,7 +115,7 @@ describe('git changes routes', () => {
     expect(status.branch).toBe('main')
     expect(status.changes).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: 'a.txt', kind: 'modified', additions: 1, deletions: 0 }),
-      expect.objectContaining({ path: 'b.txt', kind: 'untracked' }),
+      expect.objectContaining({ path: 'b.txt', kind: 'untracked', additions: 1, deletions: 0 }),
     ]))
 
     const diffFetch = routes.get(GIT_DIFF_PATH)!

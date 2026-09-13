@@ -46,6 +46,8 @@ describe('render branch tails', () => {
     const source = { getSnapshot: () => snap, subscribe: () => () => {} }
     const view = render(
       <StatsPills
+        selectView={() => {}}
+        renderSlot={() => null}
         t={t}
         useChat={bindSnapshotSelector(source)}
         useProjection={() => undefined}

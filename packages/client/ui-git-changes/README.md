@@ -32,3 +32,7 @@ The package is dual-face:
   its full body.
 - **Branch comparison** — the base list is local branches only; remote refs and
   arbitrary revisions are deferred.
+
+## Composer statistics
+
+The browser contributes uncommitted file totals to `conversation.composer.dock.stats`, beside session usage. It shows localized changed-file copy, green additions, and red deletions. Clicking the statistics selects the current session’s Changes tab through the Conversation shell’s existing view action. Counts refresh when the session changes, its running state changes, or the window regains focus; clean or unavailable repositories hide the entry. Branch comparison selection does not affect the footer. File counts include staged, unstaged, untracked, and binary changes; line totals use the working tree relative to HEAD (the empty tree before the first commit), with untracked text counted as additions. Binary files contribute no text lines.

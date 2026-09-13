@@ -168,6 +168,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.input.overlay': { kind: 'list'; scope: 'session' }
     /** Ambient entries below the composer card. */
     'conversation.composer.dock': { kind: 'list'; scope: 'session' }
+    /** Dock content with the current session's tab-selection action. */
+    'conversation.composer.dock.content': { kind: 'list'; scope: 'session'; owner: { selectView: (view: string) => void } }
     /** Compact controls at the left of the composer tool row. */
     'conversation.input.left': { kind: 'list'; scope: 'session' }
     /** Compact controls before the composer submit action. */

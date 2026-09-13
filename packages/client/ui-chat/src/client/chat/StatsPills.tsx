@@ -9,7 +9,7 @@ import { memo, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconDatabaseOutline16, IconGaugeOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRenderSlots, PropsRuntime, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: merges the sessionStats key into SessionProjectionMap for useProjection.
 import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
@@ -121,7 +121,8 @@ export function billedInputTokens(usage: TokenUsageProjection): number {
 }
 
 /** Props: the conversation-snapshot selector plus the projection read seat. */
-export interface StatsPillsProps {
+export interface StatsPillsProps extends Pick<PropsRenderSlots<'conversation.composer.dock.stats'>, 'renderSlot'>,
+  Pick<PropsRuntime<'conversation.composer.dock.content'>, 'selectView'> {
   useChat: SnapshotSelectorHook<ChatSnapshot>
   useProjection: UseProjection
   /** The owning dock's locale seat. */
@@ -314,7 +315,7 @@ function UsagePill({ usage, t, dialog }: {
   )
 }
 
-export const StatsPills = memo(function StatsPills({ useChat, useProjection, t }: StatsPillsProps) {
+export const StatsPills = memo(function StatsPills({ useChat, useProjection, t, renderSlot, selectView }: StatsPillsProps) {
   const settledNodes = useChat(s => s.legacy.nodes)
   const usage = useProjection('tokenUsage')
   // One exclusive slot for both dialogs: opening either pill closes the other.
@@ -329,7 +330,8 @@ export const StatsPills = memo(function StatsPills({ useChat, useProjection, t }
   // billing (e.g. every request failed) shows its counts without a usage pill.
   const hasTokens = usage !== undefined
     && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)
-  if (stats.steps === 0 && !hasTokens) return null
+  const extraStats = renderSlot('conversation.composer.dock.stats', { selectView })
+  if (stats.steps === 0 && !hasTokens && extraStats == null) return null
   // data-composer-stats: InputBar's `.root:has([data-composer-stats])` rule
   // tightens the composer's bottom clearance only while this row renders.
   return (
@@ -354,6 +356,7 @@ export const StatsPills = memo(function StatsPills({ useChat, useProjection, t }
           }}
         />
       )}
+      {extraStats}
     </div>
   )
 })

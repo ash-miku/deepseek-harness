@@ -1,4 +1,5 @@
 /** Registers the target-neutral Conversation assembly, shell, input, and docks. */
+import { ComposerDock } from './skeleton/ComposerDock.tsx'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -362,6 +363,18 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       },
     }),
   }, ConversationSessionHeader)
+
+  slots.inject('conversation.composer.dock', () => slots.register({
+    name: 'conversation.composer.dock', id: 'content', order: 0,
+    children: { 'conversation.composer.dock.content': { kind: 'list', scope: 'session' } },
+    store: conversationStore,
+    inject: (sessionId: SessionId, actions: BoundActions<typeof conversationStore>) => ({
+      selectView: (view: string) => {
+        activateView(sessionId, view)
+        actions.setView(view)
+      },
+    }),
+  }, ComposerDock))
 
   const registerComposerBar = () => slots.register({
     name: 'conversation.composer.bar',

@@ -31,9 +31,9 @@ export interface GitChange {
   readonly staged: boolean
   /** The working-tree side carries a change. */
   readonly unstaged: boolean
-  /** Added lines in this file's diff; absent for an untracked or binary file. */
+  /** Added lines in this file's diff; absent for binary files or unavailable counts. */
   readonly additions?: number
-  /** Removed lines in this file's diff; absent for an untracked or binary file. */
+  /** Removed lines in this file's diff; absent for binary files or unavailable counts. */
   readonly deletions?: number
 }
 

@@ -178,6 +178,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 
   interface SlotMap {
+    /** Additional workspace statistics beside the session usage pills. */
+    'conversation.composer.dock.stats': { kind: 'list'; scope: 'session'; owner: { selectView: (view: string) => void } }
+
     /**
      * Final Chat node renderer, keyed by `ChatNodeKind`. The component receives
      * the typed node, shared Chat actions, and Turn-data hook. Reusing a key
