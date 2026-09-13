@@ -14,7 +14,9 @@ export const inject = ['slots']
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
-  if (process.env.DSH_CLIENT_BUILD_PROFILE !== 'official') return
+  // This checkout always shows the official mark and name. Upstream gates the
+  // registration on DSH_CLIENT_BUILD_PROFILE === 'official'; pinning it here
+  // keeps the sidebar on the official brand across local and official builds.
   ctx.slots.inject('sidebar.brand.mark', () =>
     ctx.slots.inject('sidebar.brand.name', function* () {
       yield ctx.slots.register({ name: 'sidebar.brand.mark' }, OfficialBrandMark)

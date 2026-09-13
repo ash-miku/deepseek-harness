@@ -198,7 +198,9 @@ export function AppFrame({
   const onRightbarDrag = useCallback((dx: number) => {
     actions.setRightbar(rightbarBase.current - dx)
   }, [actions])
-  const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.localBuild')
+  // This checkout pins the official product name; a configured build title
+  // (DSH_CLIENT_TITLE) still wins, and the local-build label was the upstream fallback.
+  const productTitle = process.env.DSH_CLIENT_TITLE ?? t('brand.productName')
   const main = useMemo(() => (
     <MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} />
   ), [usePanelInfo, renderSlot])
