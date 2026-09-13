@@ -31,6 +31,8 @@ export const zh = {
   'kind.typechange': '类型变更',
   'kind.unmerged': '冲突',
   'kind.untracked': '未跟踪',
+  'flag.staged': '已暂存',
+  'flag.unstaged': '未暂存',
   'summary.totals': '+{added} −{removed}',
 }
 
@@ -62,6 +64,8 @@ export const en = {
   'kind.typechange': 'Type changed',
   'kind.unmerged': 'Conflicted',
   'kind.untracked': 'Untracked',
+  'flag.staged': 'Staged',
+  'flag.unstaged': 'Unstaged',
   'summary.totals': '+{added} −{removed}',
 }
 

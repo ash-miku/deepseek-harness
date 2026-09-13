@@ -243,8 +243,8 @@ export function GitChangesView({ sessionId, t }: ConvViewProps & PropsLocale<'ch
                   {(change.deletions ?? 0) > 0 && <span className={css.statRemoved}>−{change.deletions}</span>}
                 </span>
                 <span className={css.flags}>
-                  {change.staged && <span className={css.flagStaged} title="staged">●</span>}
-                  {change.unstaged && <span className={css.flagUnstaged} title="unstaged">●</span>}
+                  {change.staged && <span className={css.flagStaged} title={t('flag.staged')}>●</span>}
+                  {change.unstaged && <span className={css.flagUnstaged} title={t('flag.unstaged')}>●</span>}
                 </span>
               </button>
             ))}
