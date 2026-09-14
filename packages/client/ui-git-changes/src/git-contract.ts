@@ -45,8 +45,15 @@ export interface GitStatusValue {
   /** Current branch name, or null while HEAD is detached. */
   readonly branch: string | null
   readonly detached: boolean
-  /** Changed paths, sorted by path. */
+  /**
+   * Changed paths the response carries, sorted by path and cut to the Host's
+   * cap. Tracked changes fill the cap before untracked ones.
+   */
   readonly changes: readonly GitChange[]
+  /** Total changed paths before the cap, so a cut list still reports the real count. */
+  readonly total: number
+  /** Whether {@link changes} omits paths past the cap. */
+  readonly truncated: boolean
   /** Local branch names, newest commit first. */
   readonly branches: readonly string[]
 }
@@ -88,6 +95,7 @@ export function isGitStatusResult(value: unknown): value is GitStatusResult {
   if (!value.repo) return typeof value.message === 'string'
   if (typeof value.root !== 'string' || typeof value.detached !== 'boolean') return false
   if (value.branch !== null && typeof value.branch !== 'string') return false
+  if (typeof value.total !== 'number' || typeof value.truncated !== 'boolean') return false
   if (!Array.isArray(value.changes) || !Array.isArray(value.branches)) return false
   if (!value.branches.every(branch => typeof branch === 'string')) return false
   return value.changes.every(change => isGitChange(change))

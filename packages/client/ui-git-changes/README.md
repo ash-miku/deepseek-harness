@@ -38,7 +38,7 @@ Git runs through `execFile` without a shell; every browser-supplied path and ref
 <a id="composer-statistics"></a>
 ## Composer statistics
 
-The browser contributes uncommitted file totals to `conversation.composer.dock.stats`, beside session usage. It shows localized changed-file copy, green additions, and red deletions. Clicking the statistics selects the current session's Changes tab through the Conversation shell's existing view action. Counts refresh when the session changes, its running state changes, or the window regains focus; clean or unavailable repositories hide the entry. Branch comparison selection does not affect the footer. File counts include staged, unstaged, untracked, and binary changes; line totals use the working tree relative to HEAD (the empty tree before the first commit), with untracked text counted as additions. Binary files contribute no text lines.
+The browser contributes uncommitted file totals to `conversation.composer.dock.stats`, beside session usage. It shows localized changed-file copy, green additions, and red deletions. Clicking the statistics selects the current session's Changes tab through the Conversation shell's existing view action. Counts refresh when the session changes, its running state changes, or the window regains focus; clean or unavailable repositories hide the entry. Branch comparison selection does not affect the footer. File counts include staged, unstaged, untracked, and binary changes, and stay the untruncated total when the status list is capped; line totals use the working tree relative to HEAD (the empty tree before the first commit), with untracked text counted as additions. Binary files contribute no text lines.
 
 -----
 
@@ -65,6 +65,7 @@ None; this package neither assembles nor sends a provider request.
 
 - **No hunk staging** — the view is read-only; staging, discarding, and commit actions are not implemented.
 - **Untracked diff cap** — an untracked file over 2 MiB is summarized without its full body.
+- **Status list cap** — the status route returns at most 100 changed paths, tracked changes ahead of untracked ones, and reports the untruncated count in `total` with a `truncated` flag; the view shows the real total and notes the cut.
 - **Branch comparison** — the base list is local branches only; remote refs and arbitrary revisions are deferred.
 - No invariant companion is published because these surfaces own no relationship that two independent observations could diverge on.
 

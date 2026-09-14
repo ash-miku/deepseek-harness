@@ -10,7 +10,7 @@ import { zh } from '../src/client/locales.ts'
 
 type Props = ComponentProps<typeof GitChangesStats>
 const t: Props['t'] = makeTranslate(zh, commonZh)
-const status = { repo: true, root: '/fixture', branch: 'main', detached: false, branches: ['main'], changes: [
+const status = { repo: true, root: '/fixture', branch: 'main', detached: false, total: 3, truncated: false, branches: ['main'], changes: [
   { path: 'a.txt', kind: 'modified', staged: true, unstaged: true, additions: 4, deletions: 2 },
   { path: 'b.txt', kind: 'untracked', staged: false, unstaged: true, additions: 3, deletions: 0 },
   { path: 'c.bin', kind: 'modified', staged: false, unstaged: true },
@@ -35,7 +35,7 @@ describe('GitChangesStats', () => {
     expect(view.container.textContent).toMatchInlineSnapshot('"3 个文件已更改+7−2"')
     view.rerender(<GitChangesStats {...props()} />)
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
-    fetcher.mockImplementation(async () => Response.json({ ...status, changes: [] }))
+    fetcher.mockImplementation(async () => Response.json({ ...status, changes: [], total: 0 }))
     fireEvent(window, new Event('focus'))
     await waitFor(() => expect(view.container.textContent).toBe(''))
   })

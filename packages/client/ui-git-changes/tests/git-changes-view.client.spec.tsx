@@ -23,11 +23,25 @@ const STATUS = {
   branch: 'feature',
   detached: false,
   changes: [],
+  total: 0,
+  truncated: false,
   branches: ['release-6.0.0', 'main'],
 }
 
 function statusResponse(): Response {
   return Response.json(STATUS)
+}
+
+function truncatedResponse(total: number): Response {
+  return Response.json({
+    ...STATUS,
+    changes: [
+      { path: 'a.txt', kind: 'modified', staged: false, unstaged: true },
+      { path: 'b.txt', kind: 'untracked', staged: false, unstaged: true },
+    ],
+    total,
+    truncated: true,
+  })
 }
 
 afterEach(() => {
@@ -53,5 +67,17 @@ describe('GitChangesView comparison base', () => {
       expect(trigger.textContent).toContain('release-6.0.0')
       expect(fetcher.mock.calls.some(([url]) => String(url).includes('base=release-6.0.0'))).toBe(true)
     })
+  })
+
+  it('shows the untruncated total and a notice when the Host caps the list', async () => {
+    const fetcher = vi.fn().mockImplementation(async (input: unknown) => String(input).includes('/diff')
+      ? Response.json({ path: 'a.txt', base: null, unified: '', binary: false, truncated: false })
+      : truncatedResponse(42))
+    vi.stubGlobal('fetch', fetcher)
+
+    render(<GitChangesView {...({ sessionId: 's1', t } as unknown as ComponentProps<typeof GitChangesView>)} />)
+
+    await screen.findByText('改动过多，仅显示前 2 个文件（共 42 个）')
+    expect(screen.getByText('42 个文件')).toBeTruthy()
   })
 })

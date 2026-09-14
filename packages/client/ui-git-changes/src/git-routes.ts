@@ -13,6 +13,31 @@ import { git, untrackedDiff, validRef, validRepoPath } from './git-service.ts'
 
 const NO_STORE = { 'cache-control': 'no-store' } as const
 
+/**
+ * Largest number of changed paths one status response carries. Each untracked
+ * path costs one `git diff --no-index` process for its line counts and the
+ * response renders as a list, so a workspace with a huge untracked tree
+ * (node_modules and the like) is cut before that loop instead of streamed
+ * whole.
+ */
+const MAX_CHANGES = 100
+
+/**
+ * Cut a path-sorted change list to the response cap, keeping tracked changes
+ * ahead of untracked ones so untracked noise cannot hide them.
+ * @param changes - every changed path, sorted by path.
+ * @returns the paths the response carries, still in path order.
+ */
+function capChanges(changes: readonly GitChange[]): GitChange[] {
+  if (changes.length <= MAX_CHANGES) return [...changes]
+  const kept = new Set<GitChange>(changes.filter(change => change.kind !== 'untracked').slice(0, MAX_CHANGES))
+  for (const change of changes) {
+    if (change.kind !== 'untracked' || kept.size === MAX_CHANGES) continue
+    kept.add(change)
+  }
+  return changes.filter(change => kept.has(change))
+}
+
 /** Read the required Session identity from a query string. */
 function readSessionId(query: URLSearchParams): SessionId | null {
   const value = query.get('sessionId')
@@ -190,22 +215,28 @@ async function statusFor(ctx: Context, query: URLSearchParams, signal: AbortSign
       if (path !== '') changes.push({ path, kind: 'untracked', staged: false, unstaged: true })
     }
   }
-  for (let index = 0; index < changes.length; index += 1) {
-    const change = changes[index]
+  changes.sort((left, right) => left.path.localeCompare(right.path))
+  const total = changes.length
+  const shown = capChanges(changes)
+  // Untracked line counts cost one Git process per path; only the paths the
+  // response carries need them.
+  for (let index = 0; index < shown.length; index += 1) {
+    const change = shown[index]
     if (change === undefined || change.kind !== 'untracked') continue
     const result = await git(repo.root, ['diff', '--no-index', '--numstat', '-z', '--no-ext-diff', '--no-textconv', '--', devNull, change.path], signal)
     if (signal.aborted) throw signal.reason
     if (result.code > 1) continue
     const counts = parseNumstatZ(result.stdout).values().next().value
-    if (counts !== undefined) changes[index] = { ...change, ...counts }
+    if (counts !== undefined) shown[index] = { ...change, ...counts }
   }
-  changes.sort((left, right) => left.path.localeCompare(right.path))
   const value: GitStatusResult = {
     repo: true,
     root: repo.root,
     branch: repo.branch,
     detached: repo.branch === null,
-    changes,
+    changes: shown,
+    total,
+    truncated: shown.length < total,
     branches: repo.branches,
   }
   return Response.json(value, { headers: NO_STORE })

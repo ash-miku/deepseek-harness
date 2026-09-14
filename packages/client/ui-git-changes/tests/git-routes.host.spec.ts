@@ -140,4 +140,35 @@ describe('git changes routes', () => {
       `http://localhost${GIT_DIFF_PATH}?${new URLSearchParams({ sessionId: 'owner', path: '../etc/passwd' })}`))
     expect(response.status).toBe(400)
   })
+
+  it('caps a large tracked change list and reports the untruncated total', async () => {
+    for (let index = 0; index < 101; index += 1) await writeFile(join(root, `t${index}.txt`), 'x\n')
+    await run('git', ['-C', root, 'add', '.'])
+    await run('git', ['-C', root, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'bulk'])
+    for (let index = 0; index < 101; index += 1) await writeFile(join(root, `t${index}.txt`), 'x\ny\n')
+    const route = routeFixture(root).get(GIT_STATUS_PATH)!
+    const result = await (await route.fetch(new Request(`http://localhost${GIT_STATUS_PATH}?sessionId=owner`))).json() as {
+      total: number
+      truncated: boolean
+      changes: Array<{ kind: string }>
+    }
+    expect(result.total).toBe(101)
+    expect(result.truncated).toBe(true)
+    expect(result.changes).toHaveLength(100)
+    expect(result.changes.every(change => change.kind === 'modified')).toBe(true)
+  })
+
+  it('keeps tracked changes inside the cap when untracked paths would fill it', async () => {
+    for (let index = 0; index < 130; index += 1) await writeFile(join(root, `u${String(index).padStart(3, '0')}.txt`), 'x\n')
+    const route = routeFixture(root).get(GIT_STATUS_PATH)!
+    const result = await (await route.fetch(new Request(`http://localhost${GIT_STATUS_PATH}?sessionId=owner`))).json() as {
+      total: number
+      truncated: boolean
+      changes: Array<{ path: string; kind: string }>
+    }
+    expect(result.total).toBe(132)
+    expect(result.truncated).toBe(true)
+    expect(result.changes).toHaveLength(100)
+    expect(result.changes[0]).toMatchObject({ path: 'a.txt', kind: 'modified' })
+  })
 })

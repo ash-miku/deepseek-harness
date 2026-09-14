@@ -142,6 +142,8 @@ export function GitChangesView({ sessionId, t }: ConvViewProps & PropsLocale<'ch
   const splitRows = useMemo(() => mode === 'split' ? toSplit(rows) : [], [mode, rows])
   const fileTotals = useMemo(() => diffTotals(rows), [rows])
   const changes: readonly GitChange[] = status.phase === 'ready' && status.value.repo ? status.value.changes : []
+  const total = status.phase === 'ready' && status.value.repo ? status.value.total : 0
+  const truncated = status.phase === 'ready' && status.value.repo ? status.value.truncated : false
   const isRepo = status.phase === 'ready' && status.value.repo
   const baseLabel = base === '' ? t('base.working') : base
   const baseItems: MenuEntry[] = [
@@ -188,7 +190,7 @@ export function GitChangesView({ sessionId, t }: ConvViewProps & PropsLocale<'ch
               />
             </span>
             <span className={css.branch}>{status.value.branch !== null ? status.value.branch : t('branch.detached')}</span>
-            <span className={css.counts}>{t('counts.files', { count: changes.length })}</span>
+            <span className={css.counts}>{t('counts.files', { count: total })}</span>
             {hasCounts && (
               <span className={css.totalStats}>
                 <span className={css.statAdded}>+{changeTotals.added}</span>
@@ -227,6 +229,9 @@ export function GitChangesView({ sessionId, t }: ConvViewProps & PropsLocale<'ch
       {isRepo && (
         <div className={css.body}>
           <div className={css.fileList}>
+            {truncated && (
+              <div className={css.notice}>{t('list.truncated', { shown: changes.length, total })}</div>
+            )}
             {changes.length === 0 && <div className={css.notice}>{t('empty.clean')}</div>}
             {changes.map(change => (
               <button

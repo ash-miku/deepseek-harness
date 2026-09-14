@@ -43,14 +43,17 @@ export function GitChangesStats({ sessionId, useSession, t, selectView }: Props)
 
   if (status?.sessionId !== sessionId || !status.value.repo) return null
   const changes = status.value.changes
-  if (changes.length === 0) return null
+  // The file count stays the untruncated total; line totals sum only the
+  // changed paths the Host's cap returned.
+  const total = status.value.total
+  if (total === 0) return null
   const totals = changes.reduce((sum, change) => ({
     added: sum.added + (change.additions ?? 0),
     removed: sum.removed + (change.deletions ?? 0),
   }), { added: 0, removed: 0 })
   return (
-    <button type="button" onClick={() => { selectView('changes') }} className={css.composerStats} title={t('stats.label', { count: changes.length, ...totals })}>
-      <span>{t('stats.files', { count: changes.length })}</span>
+    <button type="button" onClick={() => { selectView('changes') }} className={css.composerStats} title={t('stats.label', { count: total, ...totals })}>
+      <span>{t('stats.files', { count: total })}</span>
       <span className={css.statAdded}>+{totals.added}</span>
       <span className={css.statRemoved}>−{totals.removed}</span>
     </button>
