@@ -8,6 +8,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+    - tab "Changes"
 - text: Show the Markdown image policy. {{clock}}
 - button "Copy":
   - img

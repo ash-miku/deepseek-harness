@@ -45,6 +45,8 @@ const OVERLAY = fileURLToPath(new URL('./produced-files.overlay.yml', import.met
 const MODE = webSnapshotMode()
 const SEED_ID = 'clickable-links-gallery-web-e2e'
 const DONE = 'LINK_GALLERY_DONE'
+// Seeded events and browser time share a day independently of host timezones.
+const GALLERY_TIME = Date.UTC(2026, 0, 15, 12)
 
 const GUIDE_URL = 'https://docs.example.test/guide'
 const API_URL = 'https://docs.example.test/api'
@@ -192,7 +194,6 @@ const CALLS: GalleryCall[] = [
  */
 function galleryFixture(imageUrl: string): string {
   const session = Session.create(SessionId('clickable-links-gallery-source'))
-  const eventTimeOrigin = new Date().setHours(12, 0, 0, 0)
   session.append('turn/start', { turn: 1 })
   const user = session.append('user/message', createUserMessage({
     content: text('Assemble the link gallery: write the report and styles, inspect the sources, and summarize.'),
@@ -289,7 +290,7 @@ function galleryFixture(imageUrl: string): string {
     }),
     ...session.snapshotEvents().map(event => JSON.stringify({
       ...event,
-      time: eventTimeOrigin + event.seq * 1_000,
+      time: GALLERY_TIME + event.seq * 1_000,
     })),
     '',
   ].join('\n')
@@ -305,9 +306,10 @@ describe('web e2e: clickable links gallery', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ extraOverlayPath: OVERLAY })
     imageUrl = new URL('/favicon.svg', scaffold.baseUrl).toString()
-    await seedSession(scaffold, galleryFixture(imageUrl), SEED_ID)
+    await seedSession(scaffold, galleryFixture(imageUrl), SEED_ID, undefined, { createdAt: GALLERY_TIME })
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
+    await page.clock.setFixedTime(GALLERY_TIME + 60_000)
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -402,7 +404,7 @@ describe('web e2e: clickable links gallery', () => {
     // styles: link-blue 500-weight text, no underline at rest, dotted underline
     // on hover, and a leading currentColor glyph. Light theme, so the link
     // alias resolves to deepseek-500.
-    const LINK_BLUE = 'rgb(65, 118, 230)'
+    const LINK_BLUE = 'rgb(58, 131, 247)'
     const styleOf = async (target: ReturnType<Page['locator']>, property: string): Promise<string> =>
       target.evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), property)
     const guideLink = markdown.locator(`a[href="${GUIDE_URL}"]`).first()
@@ -415,7 +417,7 @@ describe('web e2e: clickable links gallery', () => {
       ['produced chip', chip],
     ] as const) {
       expect.soft(await styleOf(link, 'color'), `${name} color`).toBe(LINK_BLUE)
-      expect.soft(await styleOf(link, 'font-weight'), `${name} weight`).toBe('500')
+      expect.soft(await styleOf(link, 'font-weight'), `${name} weight`).toBe(name === 'file mention' ? '700' : '500')
       expect.soft(await styleOf(link, 'text-decoration-line'), `${name} at rest`).toBe('none')
       expect.soft(await link.locator('svg').count(), `${name} glyph`).toBe(1)
     }

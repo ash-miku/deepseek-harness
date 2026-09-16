@@ -165,10 +165,10 @@ export class WorkspaceCommands {
   }
 
   /**
-   * Remove one Session from the registry-global archive set. The Session log
-   * and its Workspace accounting slot are untouched; an unknown id is an
-   * idempotent no-op upstream, so no existence check is needed here.
-   * @param request - Session identity to restore.
+   * Drop one Session from the registry-global archive set. An id that is not
+   * archived is not an error: the call is idempotent, so a lost race with
+   * another surface resolves as a no-op.
+   * @param request - Session identity to unarchive.
    * @returns the complete resulting archive set.
    */
   async unarchiveSession(request: WorkspaceUnarchiveSessionRequest): Promise<WorkspaceArchiveValue> {

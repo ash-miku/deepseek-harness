@@ -1,7 +1,7 @@
 /**
- * Derives the workspace browser tree from Host Workspace order and membership.
- * Unassigned Sessions trail under Ungrouped; only the selected blank Session
- * remains visible.
+ * Derives the workspace browser tree from caller-projected Workspace and
+ * Session order. Unassigned Sessions trail under Ungrouped; only the selected
+ * blank Session remains visible.
  */
 import {
   type SessionListState, type SessionSearchResultItem, type SessionSummary,
@@ -20,6 +20,12 @@ import {
 /** Group key for Sessions outside every Workspace. */
 export const UNGROUPED_KEY = ''
 
+/** Group key for sessions hidden from ordinary grouping by the archive set. */
+export const ARCHIVED_KEY = '__archived__'
+
+/** Group key for favorited (pinned) sessions rendered before ordinary groups. */
+export const FAVORITE_KEY = '__favorite__'
+
 /**
  * Resolve the Workspace browser group that owns one Session.
  * @param workspaces - authoritative Workspace membership.
@@ -37,12 +43,6 @@ export function owningGroupKey(
 /** Pending interaction kinds with dedicated Workspace-row presentation. */
 export type SessionPendingInteractionStatus = 'approval' | 'plan-review' | 'question'
 type SessionPendingInteractions = ReadonlyMap<SessionId, SessionPendingInteractionBase>
-
-/** Group key for sessions hidden from ordinary grouping by the archive set. */
-export const ARCHIVED_KEY = '__archived__'
-
-/** Group key for favorited (pinned) sessions rendered before ordinary groups. */
-export const FAVORITE_KEY = '__favorite__'
 
 /** One top-level session row in a group or the flat list. */
 export interface SessionNode {
@@ -72,9 +72,9 @@ export type SessionOrderBy = 'manual' | 'updated'
 
 /** One workspace group section: header row facts + visible top-level session rows. */
 export interface GroupNode {
-  /** Group key: the workspace id, {@link UNGROUPED_KEY}, or {@link ARCHIVED_KEY}. */
+  /** Group key: the workspace id, {@link UNGROUPED_KEY}, {@link FAVORITE_KEY}, or {@link ARCHIVED_KEY}. */
   key: string
-  /** Backing Workspace id; absent for ungrouped and archived buckets. */
+  /** Backing Workspace id; absent for ungrouped, favorite, and archived buckets. */
   workspaceId: WorkspaceId | undefined
   /** The group is the registry-global archived-session bucket. */
   archived?: boolean
@@ -144,17 +144,75 @@ export function workspaceLabel(cwd: string | undefined): string {
   return base !== '' ? base : cwd
 }
 
-/** Recency comparator: newest first, id as the deterministic tiebreak (ids are unique per group). */
-function byRecency(a: SessionSummary, b: SessionSummary): number {
-  if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt
-  return a.id < b.id ? -1 : 1
+/**
+ * Project known account members by current Session recency.
+ * @param sessionIds - authoritative account membership.
+ * @param summaries - current Session summaries; members without a summary are omitted until it arrives.
+ * @returns known members newest first, with Session identity as the deterministic tie-break.
+ */
+export function orderByRecency(
+  sessionIds: readonly SessionId[],
+  summaries: SessionListState['byId'],
+): SessionId[] {
+  return sessionIds.flatMap((id) => {
+    const summary = summaries[id]
+    return summary === undefined ? [] : [{ id, updatedAt: summary.updatedAt }]
+  })
+    .sort((a, b) => {
+      if (a.updatedAt !== b.updatedAt) return b.updatedAt - a.updatedAt
+      return a.id < b.id ? -1 : 1
+    })
+    .map(member => member.id)
+}
+
+/**
+ * Reconcile a browser-local manual order with current account membership.
+ * @param memberIds - authoritative account membership.
+ * @param savedOrder - previously saved browser-local order.
+ * @param summaries - current Session summaries used to append newly known members by recency.
+ * @returns retained saved slots followed by newly known members; departed members and unknown new members are omitted.
+ */
+export function reconcileManualOrder(
+  memberIds: readonly SessionId[],
+  savedOrder: readonly string[] | undefined,
+  summaries: SessionListState['byId'],
+): SessionId[] {
+  const members = new Map(memberIds.map(id => [id as string, id]))
+  const included = new Set<string>()
+  const ordered: SessionId[] = []
+  for (const key of savedOrder ?? []) {
+    const id = members.get(key)
+    if (id === undefined || included.has(key)) continue
+    ordered.push(id)
+    included.add(key)
+  }
+  for (const id of orderByRecency(memberIds, summaries)) {
+    if (included.has(id)) continue
+    ordered.push(id)
+    included.add(id)
+  }
+  return ordered
+}
+
+/**
+ * Keep the selected provisional New Session ahead of either base order.
+ * @param order - recency or reconciled manual order.
+ * @param currentBlank - selected blank Session in this account, when present.
+ * @returns a copy with the selected blank first and no duplicate slot.
+ */
+export function pinCurrentBlank(
+  order: readonly SessionId[],
+  currentBlank: SessionId | undefined,
+): SessionId[] {
+  if (currentBlank === undefined) return [...order]
+  return [currentBlank, ...order.filter(id => id !== currentBlank)]
 }
 
 /**
  * Ordinary sessions are visible; among blank sessions, only the current one
  * is visible. Subagent children use their parent header catalog; archived
- * sessions stay out of ordinary groups and Ungrouped, while their accounting
- * slots remain so unarchiving restores position.
+ * sessions are visible nowhere, while their accounting slots remain so
+ * unarchiving restores position.
  */
 function sessionVisible(session: SessionSummary, current: SessionId | undefined, archived: ReadonlySet<SessionId>): boolean {
   return session.origin !== 'subagent'
@@ -184,39 +242,33 @@ function buildGroup(
   createdAt: number | undefined,
   label: string,
   members: readonly SessionSummary[],
-  order: 'account' | 'recency',
 ): Group {
-  const sessions = [...members]
-  // Real Workspace order comes from sessionIds. Ungrouped falls back to
-  // recency until the browser supplies its persisted local order.
-  if (order === 'recency') sessions.sort(byRecency)
-  return { key, workspaceId, cwd, createdAt, label, sessions }
+  return { key, workspaceId, cwd, createdAt, label, sessions: [...members] }
 }
 
 /** Apply a stored Ungrouped order and append newly loose Sessions by recency. */
-function orderedUngrouped(members: readonly SessionSummary[], stored: readonly string[]): SessionSummary[] {
+function orderedUngrouped(
+  members: readonly SessionSummary[],
+  stored: readonly string[] | undefined,
+  summaries: SessionListState['byId'],
+): SessionSummary[] {
   const byId = new Map(members.map(session => [session.id as string, session]))
-  const included = new Set<string>()
-  const ordered: SessionSummary[] = []
-  for (const key of stored) {
-    const session = byId.get(key)
-    if (session === undefined || included.has(key)) continue
-    ordered.push(session)
-    included.add(key)
-  }
-  for (const session of [...members].sort(byRecency)) {
-    if (included.has(session.id)) continue
-    ordered.push(session)
-  }
-  return ordered
+  const ids = stored === undefined
+    ? orderByRecency(members.map(session => session.id), summaries)
+    : reconcileManualOrder(members.map(session => session.id), stored, summaries)
+  return ids.flatMap((id) => {
+    const session = byId.get(id)
+    /* v8 ignore next -- ids are projected exclusively from the members used to build byId. */
+    return session === undefined ? [] : [session]
+  })
 }
 
 /**
- * Group Sessions by Host Workspace: one group per entity in stable Host
- * order, with members resolved from sessionIds in their stored order. Sessions
- * outside every Workspace trail in the browser-local Ungrouped order, which
- * falls back to recency before that order is initialized. Favorited sessions
- * leave ordinary groups so the leading Favorites bucket owns their only copy.
+ * Group Sessions by Workspace: one group per caller-ordered entity, with
+ * members resolved from caller-ordered sessionIds. Sessions outside every
+ * Workspace trail in the browser-local Ungrouped order, which falls back to
+ * recency before that order is initialized. Favorited sessions leave ordinary
+ * groups so the leading Favorites bucket owns their only copy.
  */
 function groupByWorkspace(
   list: SessionListState,
@@ -238,13 +290,14 @@ function groupByWorkspace(
     }
     groups.push(buildGroup(
       workspace.workspaceId, workspace.workspaceId, workspace.path,
-      Date.parse(workspace.createdAt), workspace.title, members, 'account',
+      Date.parse(workspace.createdAt), workspace.title, members,
     ))
   }
   const stray = list.ids
     .map(id => list.byId[id])
     .filter((s): s is SessionSummary =>
-      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived) && !favorited.has(s.id))
+      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived)
+      && !favorited.has(s.id))
   if (stray.length > 0) {
     groups.push(buildGroup(
       UNGROUPED_KEY,
@@ -252,8 +305,7 @@ function groupByWorkspace(
       undefined,
       undefined,
       '',
-      ungroupedOrder === undefined ? stray : orderedUngrouped(stray, ungroupedOrder),
-      ungroupedOrder === undefined ? 'recency' : 'account',
+      orderedUngrouped(stray, ungroupedOrder, list.byId),
     ))
   }
   return groups
@@ -297,13 +349,14 @@ function sessionNode(
 /**
  * Derive the workspace browser groups with every session as a top-level row.
  *
- * Every group shows; sessions populate under expanded groups in the selected
- * local order. Blank sessions are excluded except for the selected
- * provisional New Session row; archived sessions live in the trailing archived bucket.
- * Content search lives outside this derivation
+ * The Favorites bucket leads, ordinary Workspace groups follow, and the
+ * registry-global archived bucket trails. Sessions populate under expanded
+ * groups in the selected local order. Blank sessions are excluded except for
+ * the selected provisional New Session row; archived sessions live only in the
+ * trailing archived bucket. Content search lives outside this derivation
  * (see {@link deriveSearchResults}).
  * @param list - sessions list snapshot (`current` feeds containsCurrent).
- * @param workspaces - real workspaces in stable Host order.
+ * @param workspaces - real Workspaces in Host group order with caller-projected Session order.
  * @param archivedSessionIds - registry-global archive set.
  * @param pendingInteractions - pending UI interactions by Session.
  * @param view - local expansion arrays.
@@ -316,7 +369,7 @@ export function deriveGroups(
   archivedSessionIds: readonly SessionId[],
   pendingInteractions: SessionPendingInteractions,
   view: TreeView,
-  favoriteSessionIds: readonly SessionId[],
+  favoriteSessionIds: readonly SessionId[] = [],
 ): GroupNode[] {
   const archived = new Set(archivedSessionIds)
   const favorited = new Set(favoriteSessionIds)
@@ -331,26 +384,28 @@ export function deriveGroups(
         : owningGroupKey(workspaces, list.current)
   const groups: GroupNode[] = []
 
-  // Favorited (pinned) sessions first, before ordinary groups
-  const favoritedSessions = list.ids
-    .map(id => list.byId[id])
-    .filter((s): s is SessionSummary =>
-      s !== undefined && favorited.has(s.id) && sessionVisible(s, list.current, archived))
-  if (favoritedSessions.length > 0) {
+  // Favorited (pinned) sessions lead every grouping surface; their ordinary
+  // group copy is suppressed so the bucket owns their only row.
+  const favoritedIds = list.ids.filter((id) => {
+    const s = list.byId[id]
+    return s !== undefined && favorited.has(id) && sessionVisible(s, list.current, archived)
+  })
+  if (favoritedIds.length > 0) {
+    const sessions = orderByRecency(favoritedIds, list.byId)
     const expanded = expandedGroups.has(FAVORITE_KEY)
     groups.push({
       key: FAVORITE_KEY,
       workspaceId: undefined,
+      favorite: true,
       cwd: undefined,
       createdAt: undefined,
-      favorite: true,
-      label: 'Favorites',
-      sessionCount: favoritedSessions.length,
+      label: '',
+      sessionCount: sessions.length,
       expanded,
       containsCurrent: list.current !== undefined && favorited.has(list.current),
       sessions: expanded
-        ? favoritedSessions.sort(byRecency).map(session =>
-          sessionNode(session, descendants, pendingInteractions, false, true))
+        ? sessions.map(id => sessionNode(
+          list.byId[id] as SessionSummary, descendants, pendingInteractions, false, true))
         : [],
     })
   }
@@ -367,31 +422,33 @@ export function deriveGroups(
       expanded,
       containsCurrent: g.key === currentGroup,
       sessions: expanded
-        ? g.sessions.map(session => sessionNode(session, descendants, pendingInteractions, false, false))
+        ? g.sessions.map(session => sessionNode(session, descendants, pendingInteractions))
         : [],
     })
   }
 
-  const archivedSessions = list.ids
-    .map(id => list.byId[id])
-    .filter((s): s is SessionSummary =>
-      s !== undefined && archived.has(s.id) && sessionVisible(s, list.current, new Set()))
-  if (archivedSessions.length > 0) {
+  // Archived sessions trail in their own bucket: their accounting slots stay
+  // in the ordinary groups' membership, while the row offers restore.
+  const archivedIds = list.ids.filter((id) => {
+    const s = list.byId[id]
+    return s !== undefined && archived.has(id) && sessionVisible(s, list.current, new Set())
+  })
+  if (archivedIds.length > 0) {
+    const sessions = orderByRecency(archivedIds, list.byId)
     const expanded = expandedGroups.has(ARCHIVED_KEY)
-    const favorite = new Set(favoriteSessionIds)
     groups.push({
       key: ARCHIVED_KEY,
       workspaceId: undefined,
+      archived: true,
       cwd: undefined,
       createdAt: undefined,
-      archived: true,
-      label: 'Archived',
-      sessionCount: archivedSessions.length,
+      label: '',
+      sessionCount: sessions.length,
       expanded,
       containsCurrent: list.current !== undefined && archived.has(list.current),
       sessions: expanded
-        ? archivedSessions.sort(byRecency).map(session =>
-          sessionNode(session, descendants, pendingInteractions, true, favorite.has(session.id)))
+        ? sessions.map(id => sessionNode(
+          list.byId[id] as SessionSummary, descendants, pendingInteractions, true, favorited.has(id)))
         : [],
     })
   }
@@ -399,35 +456,47 @@ export function deriveGroups(
 }
 
 /**
- * Derive the flat session list ("In one list" mode): every session — fork
- * children and archived sessions included — as a top-level row, strictly
- * newest-first. Archived rows carry a flag so the menu offers restore. No
- * grouping, no parent/child adjacency. Content search lives outside this
- * derivation (see {@link deriveSearchResults}).
+ * Select flat-list members without deriving row presentation or ordering.
  * @param list - sessions list snapshot.
  * @param archivedSessionIds - registry-global archive set.
+ * @param includeArchived - keep archived members so the flat list can flag them for restore; default false.
+ * @returns known visible Session ids in list order, including ordinary forks and only the current blank.
+ */
+export function visibleSessionIds(
+  list: SessionListState,
+  archivedSessionIds: readonly SessionId[],
+  includeArchived = false,
+): SessionId[] {
+  const archived = includeArchived ? new Set<SessionId>() : new Set(archivedSessionIds)
+  return list.ids.filter((id) => {
+    const s = list.byId[id]
+    return s !== undefined && sessionVisible(s, list.current, archived)
+  })
+}
+
+/**
+ * Derive flat rows from the browser's ordered visible Session ids.
+ * @param list - sessions list snapshot used to select the ids.
+ * @param sessionIds - known visible members in render order, including any pinned blank.
  * @param pendingInteractions - pending UI interactions by Session.
- * @param favoriteSessionIds - registry-global favorite (pinned) set.
- * @returns flat rows in render order.
+ * @param archivedSessionIds - registry-global archive set; members carry the restore flag.
+ * @param favoriteSessionIds - registry-global favorite (pinned) set; members carry the unfavorite flag.
+ * @returns flat rows in the supplied order with current status indicators.
  */
 export function deriveFlat(
   list: SessionListState,
-  archivedSessionIds: readonly SessionId[],
+  sessionIds: readonly SessionId[],
   pendingInteractions: SessionPendingInteractions,
-  favoriteSessionIds: readonly SessionId[],
+  archivedSessionIds: readonly SessionId[] = [],
+  favoriteSessionIds: readonly SessionId[] = [],
 ): SessionNode[] {
   const archived = new Set(archivedSessionIds)
   const favorited = new Set(favoriteSessionIds)
   const descendants = indexSubagentDescendants(list.byId)
-  const rows: SessionSummary[] = []
-  for (const id of list.ids) {
-    const s = list.byId[id]
-    if (s === undefined || !sessionVisible(s, list.current, new Set())) continue
-    rows.push(s)
-  }
-  rows.sort(byRecency)
-  return rows.map(session => sessionNode(
-    session, descendants, pendingInteractions, archived.has(session.id), favorited.has(session.id)))
+  return sessionIds
+    .map(id => sessionNode(
+      list.byId[id] as SessionSummary, descendants, pendingInteractions,
+      archived.has(id), favorited.has(id)))
 }
 
 /**
@@ -483,7 +552,9 @@ export function deriveSearchResults(
       local.push(summary)
     }
   }
-  local.sort(byRecency)
+  const localById = new Map(local.map(summary => [summary.id, summary]))
+  const orderedLocal = orderByRecency(local.map(summary => summary.id), list.byId)
+    .map(id => localById.get(id) as SessionSummary)
 
   const ordered: SessionSummary[] = []
   const included = new Set<SessionId>()
@@ -492,7 +563,7 @@ export function deriveSearchResults(
     included.add(summary.id)
     ordered.push(summary)
   }
-  for (const summary of local) include(summary)
+  for (const summary of orderedLocal) include(summary)
   for (const item of content.items) {
     const summary = list.byId[item.sessionId]
     if (summary !== undefined && !summary.blank && sessionVisible(summary, list.current, archived)) include(summary)

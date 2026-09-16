@@ -133,13 +133,10 @@ export function apply(ctx: Context): void {
     insertWorkspaceBefore: async (workspaceId, beforeWorkspaceId) => {
       await workspaces.insertBefore(workspaceId, beforeWorkspaceId)
     },
-    archiveSession: async (sessionId) => { await workspaces.archiveSession(sessionId) },
-    unarchiveSession: async (sessionId) => { await workspaces.unarchiveSession(sessionId) },
+    archiveSession: async (sessionId) => { await uiWorkspace.archiveSession(sessionId) },
+    unarchiveSession: async (sessionId) => { await uiWorkspace.unarchiveSession(sessionId) },
     favoriteSession: async (sessionId) => { await workspaces.favoriteSession(sessionId) },
     unfavoriteSession: async (sessionId) => { await workspaces.unfavoriteSession(sessionId) },
-    insertSessionBefore: async (workspaceId, sessionId, beforeSessionId) => {
-      await workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
-    },
     createWorkspace: input => workspaces.create(input),
     hooks: { directoryFlow: browserFlowSource, hostInfo },
   })

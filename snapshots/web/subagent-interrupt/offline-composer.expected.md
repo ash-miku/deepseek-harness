@@ -12,6 +12,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+    - tab "Changes"
 - button "System prompt":
   - img
   - img
@@ -38,5 +39,6 @@
 - button "Add files or run commands" [disabled]:
   - img
 - 'button "Access mode, current: Custom" [disabled]': Custom
+- button "Plan mode off, press to turn on" [disabled]: Plan
 - button "Stop generating"
 - button "Send message" [disabled]

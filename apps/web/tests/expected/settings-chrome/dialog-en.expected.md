@@ -13,6 +13,9 @@
     - button "Agent presets":
       - img
       - text: Agent presets
+    - button "Archived sessions":
+      - img
+      - text: Archived sessions
   - button "Open configuration file"
   - button "Close":
     - img
@@ -40,7 +43,12 @@
     - img
   - button "Decrease font size":
     - img
-  - text: px Conversation display Controls process content in completed turns
+  - text: px Font weight Adjusts text weight across the interface
+  - group "Font weight":
+    - button "Regular"
+    - button "Medium" [pressed]
+    - button "Bold"
+  - text: Conversation display Controls process content in completed turns
   - button "Compact":
     - text: Compact
     - img
@@ -48,3 +56,11 @@
   - button "Queue":
     - text: Queue
     - img
+  - text: Completion sound Choose the sound played after a task completes
+  - button "Ding-dong":
+    - text: Ding-dong
+    - img
+  - button "Preview"
+  - text: Completion sound volume Controls the app sound; system volume still applies
+  - slider "Completion sound volume": "80"
+  - text: 80%

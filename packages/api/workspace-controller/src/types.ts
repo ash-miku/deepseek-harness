@@ -104,14 +104,14 @@ export interface WorkspaceArchiveSessionRequest {
   readonly sessionId: SessionId
 }
 
+/** Session requested for restoration from the archived Session list. */
+export interface WorkspaceUnarchiveSessionRequest {
+  readonly sessionId: SessionId
+}
+
 /** Complete archived Session set after a mutation. */
 export interface WorkspaceArchiveValue {
   readonly archivedSessionIds: readonly SessionId[]
-}
-
-/** Session requested for restoration to Workspace grouping surfaces. */
-export interface WorkspaceUnarchiveSessionRequest {
-  readonly sessionId: SessionId
 }
 
 /** Session requested for pinning to the top of Workspace grouping surfaces. */

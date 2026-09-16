@@ -2,16 +2,16 @@
   - treeitem "{{workspace}}" [expanded]:
     - img
     - text: {{workspace}}
-  - treeitem "Review deepseek-harness/deepseek-harness#314 Session actions for Review deepseek-harness/deepseek-harness#314" [selected]:
-    - text: Review deepseek-harness/deepseek-harness#314
-    - button "Session actions for Review deepseek-harness/deepseek-harness#314":
+  - treeitem "Review deepseek-ai/deepseek-harness#314 Session actions for Review deepseek-ai/deepseek-harness#314" [selected]:
+    - text: Review deepseek-ai/deepseek-harness#314
+    - button "Session actions for Review deepseek-ai/deepseek-harness#314":
       - img
 
 ---
 
 - banner:
   - navigation "Session hierarchy":
-    - button "Review deepseek-harness/deepseek-harness#314" [disabled]
+    - button "Review deepseek-ai/deepseek-harness#314" [disabled]
   - img
   - text: Standard mode
   - button "More actions":
@@ -21,6 +21,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
+    - tab "Changes"
 - button "System prompt":
   - img
   - img
@@ -53,6 +54,7 @@
 - button "Add files or run commands":
   - img
 - 'button "Access mode, current: Read Only"': Read Only
+- button "Plan mode off, press to turn on": Plan
 - button "Select model, current github-webhook-review-test/reply":
   - text: github-webhook-review-test/reply
   - img

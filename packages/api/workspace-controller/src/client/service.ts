@@ -64,9 +64,8 @@ export interface IWorkspaces {
    */
   archiveSession(sessionId: SessionId): Promise<void>
   /**
-   * Restore a Session to Workspace grouping surfaces. The Session log and its
-   * Workspace accounting slot remain untouched.
-   * @param sessionId - Session to restore.
+   * Unarchive a Session from the archived Session list.
+   * @param sessionId - Session to unarchive.
    */
   unarchiveSession(sessionId: SessionId): Promise<void>
   /**

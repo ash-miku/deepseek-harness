@@ -13,6 +13,9 @@
     - button "Agent 预设":
       - img
       - text: Agent 预设
+    - button "已归档会话":
+      - img
+      - text: 已归档会话
   - button "打开配置文件"
   - button "关闭":
     - img
@@ -40,7 +43,12 @@
     - img
   - button "减小字号":
     - img
-  - text: px 对话显示 控制已完成轮次的过程内容
+  - text: px 字重 调整整页文字的字重
+  - group "字重":
+    - button "常规"
+    - button "中等" [pressed]
+    - button "加粗"
+  - text: 对话显示 控制已完成轮次的过程内容
   - button "紧凑":
     - text: 紧凑
     - img
@@ -48,3 +56,11 @@
   - button "排队发送":
     - text: 排队发送
     - img
+  - text: 任务完成提示音 选择任务结束时播放的提示音
+  - button "叮咚":
+    - text: 叮咚
+    - img
+  - button "试听"
+  - text: 提示音音量 仅影响应用内提示音，系统音量仍然有效
+  - slider "提示音音量": "80"
+  - text: 80%

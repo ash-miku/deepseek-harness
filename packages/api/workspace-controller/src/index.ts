@@ -114,8 +114,8 @@ export class WorkspaceController extends TypertRemoteService {
   }
 
   /**
-   * Restore one Session to Workspace grouping surfaces.
-   * @param request - Session identity to restore.
+   * Restore one archived Session to Workspace grouping surfaces.
+   * @param request - Session identity to unarchive.
    * @returns the complete resulting archive set.
    */
   @Remote('unarchiveSession')
