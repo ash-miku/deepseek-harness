@@ -1,41 +1,18 @@
 /* Visual baseline: deepsuite `@deepseek/md` markdown.css, adapted to CSS
-   Modules. Cite pills, header anchors, and thinking-small variants are
-   intentionally absent (no matching DOM). Token names match that sheet. */
+   Modules. Cite pills and header anchors are absent (no matching DOM).
+   Token names match that sheet. */
 
-/* Colored copy (headings, bold, inline code, quotes) reads its accent through
-   a mode-aware blend. Light follows the Codex-reference monochrome prose:
-   headings and bold reuse the body ink, inline code is neutral ink on the gray
-   chip surface, quotes recede to gray, and only links and success states carry
-   the blue/green accents. The dark override below keeps opencode's colored
-   roles instead. */
 .markdown {
-  --dsh-markdown-heading: #1a1c1f;
-  --dsh-markdown-strong: #1a1c1f;
-  --dsh-markdown-inline-code: #1a1c1f;
-  --dsh-markdown-quote: #5f6368;
-  --dsh-markdown-marker: #85898d;
   min-width: 0;
   overflow-wrap: anywhere;
   font: var(--dsw-font-markdown-base);
-  /* Base weight rides the Theme settings Font-weight axis (the token already
-     carries it; this keeps the declaration explicit for the markdown sheet). */
+  /* Base weight rides the Theme settings Font-weight axis. */
   font-weight: var(--dsh-content-font-weight, 500);
   color: var(--dsw-alias-label-primary);
 }
 
-/* Dark keeps the same monochrome prose as light: headings, bold, and inline
-   code reuse the pure-white body ink, and quotes recede to gray. */
-:global(body[data-ds-dark-theme]) .markdown {
-  --dsh-markdown-heading: #ffffff;
-  --dsh-markdown-strong: #ffffff;
-  --dsh-markdown-inline-code: #ffffff;
-  --dsh-markdown-quote: #a5a5a5;
-  --dsh-markdown-marker: #8b8b8b;
-}
-
 .markdown strong {
-  color: var(--dsh-markdown-strong);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .markdown h1 {
@@ -63,21 +40,8 @@
   margin: 16px 0;
 }
 
-.markdown :where(h1, h2, h3, h4, h5, h6) {
-  color: var(--dsh-markdown-heading);
-}
-
 .markdown :where(h1, h2, h3, h4, h5, h6) strong {
-  color: inherit;
   font-weight: inherit;
-}
-
-.markdown em {
-  /* Same amber as <strong>: italic is another inline emphasis, so it should
-     not read as a dimmer, separate tone. */
-  color: var(--dsh-markdown-strong);
-  font-style: italic;
-  font-weight: 700;
 }
 
 .markdown p {
@@ -93,15 +57,13 @@
   margin-bottom: 8px;
 }
 
-.markdown a {
+.markdown a,
+.markdown .fileLink {
   /* deepsuite markdown.css uses brand-text (blue in newDesign); this sheet
      keeps design-platform brand-text as near-black, so links use the
      dedicated link alias instead. */
   color: var(--dsw-alias-link);
-  /* Inherit the surrounding weight: a plain link then matches body prose, and a
-     URL promoted inside an inline-code chip matches that chip's bold code ink
-     (an explicit 500 here made the chip's link read lighter than its code). */
-  font-weight: inherit;
+  font-weight: 500;
   transition: box-shadow var(--ds-transition-duration) var(--ds-ease-in-out);
   position: relative;
   text-decoration: none;
@@ -121,7 +83,8 @@
   text-underline-offset: 3px;
 }
 
-.markdown a:focus-visible {
+.markdown a:focus-visible,
+.fileMention:focus-visible {
   box-shadow: 0 0 0 2px var(--dsw-alias-state-business-primary);
 }
 
@@ -152,8 +115,8 @@
 }
 
 .markdown li::marker {
-  line-height: 28px;
-  color: var(--dsh-markdown-marker);
+  line-height: 24px;
+  color: var(--dsw-alias-label-secondary);
 }
 
 /* Nested ol under ul/ol: markers inside (models sometimes emit this shape). */
@@ -188,8 +151,7 @@
 }
 
 .markdown blockquote {
-  border-left: 2px solid var(--dsh-markdown-quote);
-  color: var(--dsh-markdown-quote);
+  border-left: 2px solid var(--dsw-alias-label-caption);
   margin: 16px 0 0;
   padding-left: 14px;
 }
@@ -204,11 +166,9 @@
   display: inline-flex;
   align-items: center;
   box-sizing: border-box;
-  color: var(--dsh-markdown-inline-code);
   font: var(--dsw-font-markdown-code);
   font-family: var(--ds-font-family-code);
   font-size: 0.875em !important;
-  font-weight: 700;
   background-color: var(--dsw-alias-markdown-inline-code);
   border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: 6px;
@@ -352,10 +312,15 @@
   border: none;
   background: none;
   font: inherit;
-  font-weight: inherit;
+  font-weight: 500;
   color: var(--dsw-alias-link);
   text-decoration: none;
   cursor: pointer;
+}
+
+.fileLink {
+  max-width: 100%;
+  text-align: inherit;
 }
 
 .fileMention:hover,
@@ -363,4 +328,137 @@
   outline: none;
   text-decoration: underline dotted var(--dsw-alias-link);
   text-underline-offset: 3px;
+}
+
+.compact {
+  max-width: 100%;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.compact :is(h1, h2, h3, h4, h5, h6) {
+  margin: 8px 0 4px;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+}
+
+.compact :is(p, ul, ol, blockquote) {
+  margin: 4px 0;
+}
+
+.compact li:not(:first-child) {
+  margin-top: 2px;
+}
+
+.compact li > p {
+  margin: 4px 0;
+}
+
+.compact li::marker {
+  line-height: inherit;
+  color: inherit;
+}
+
+.compact blockquote {
+  padding-left: 8px;
+}
+
+.compact hr {
+  margin: 8px 0;
+}
+
+.compact a,
+.compact .fileMention {
+  font-weight: inherit;
+  color: inherit;
+  text-decoration: underline dotted;
+}
+
+.compact a:hover,
+.compact a:focus,
+.compact .fileMention:hover,
+.compact .fileMention:focus {
+  text-decoration-color: currentColor;
+}
+
+.compact :not(pre) > code {
+  display: inline;
+  font: inherit;
+  font-family: var(--ds-font-family-code);
+  font-size: 1em !important;
+  border-radius: 4px;
+  padding: 0 3px;
+  box-decoration-break: clone;
+}
+
+.markdown.compact :global(.md-code-block) {
+  margin: 4px 0;
+  color: inherit;
+}
+
+.compact :global(.md-code-block) > :has(> [data-code-block-banner]) {
+  position: static;
+  z-index: auto;
+}
+
+.compact [data-code-block-banner] {
+  padding: 4px 8px;
+  font: inherit;
+}
+
+.compact [data-code-block-banner] > :first-child {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.compact pre {
+  margin: 4px 0;
+  padding: 8px;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* Shiki writes token colors inline; compact code uses the surrounding text color. */
+.compact pre,
+.compact pre :is(code, span) {
+  color: inherit !important;
+}
+
+.markdown.compact .tableScroll {
+  width: 100%;
+  max-width: 100%;
+  margin: 4px 0;
+  padding-left: 0;
+}
+
+.markdown.compact .tableScroll > table {
+  z-index: auto;
+}
+
+.compact :is(th, td) {
+  padding: 4px 8px;
+  font: inherit;
+}
+
+.compact th {
+  font-weight: 600;
+}
+
+.compact :global(.katex) {
+  font-size: 1em;
+}
+
+/* Keep KaTeX's inline baseline and scroll the containing block only when needed. */
+.compact :is(p, h1, h2, h3, h4, h5, h6, ul, ol):has(:global(.katex)) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* KaTeX descenders can paint one pixel below a fractional line-box edge. */
+  padding-bottom: 1px;
+}
+
+.compact :global(.katex-display) {
+  margin: 4px 0;
 }

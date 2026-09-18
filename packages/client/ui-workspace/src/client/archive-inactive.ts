@@ -38,12 +38,15 @@ export function selectInactiveSessions(
   if (list.phase !== 'ready') return []
   const archived = new Set(archivedSessionIds)
   const pending = new Set(pendingSessionIds)
+  // The selected Session is main-view retention, not a list field.
+  const current = Object.values(list.byId)
+    .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
   const cutoff = now - days * DAY_MS
   return list.ids.flatMap((id) => {
     const session = list.byId[id]
     if (session === undefined || session.blank || session.origin === 'subagent'
       || session.running || pending.has(session.id)
-      || session.id === list.current || archived.has(session.id)
+      || session.id === current || archived.has(session.id)
       || session.updatedAt >= cutoff) return []
     return [id]
   })

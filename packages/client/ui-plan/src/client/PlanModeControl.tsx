@@ -74,10 +74,13 @@ export function PlanChip({ useProjection, locked, setPlanMode, t }: PlanChipProp
         disabled={locked || busy}
         onClick={toggle}
       >
-        {t('chip.label')}
-        <span className={css.close} aria-hidden>
-          <IconCloseFill14 size={12} />
-        </span>
+        {/* Inactive is a quiet entry; only the active target carries the close mark. */}
+        <span className={css.label}>{t('chip.label')}</span>
+        {target && (
+          <span className={css.close} aria-hidden>
+            <IconCloseFill14 size={12} />
+          </span>
+        )}
       </button>
       {error !== null && <span className={css.error} role="status" title={error}>{t('chip.exitFailed')}</span>}
     </span>

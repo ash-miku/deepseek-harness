@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { bindSnapshotSelector, makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -25,8 +25,8 @@ afterEach(() => {
 
 function emptySessions() {
   return bindSnapshotSelector(createSnapshotStore<SessionListState>({
-    ids: [], byId: {}, current: undefined, phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
+    ids: [], byId: {}, phase: 'ready',
+    subagentsByParent: {}, jobsBySession: {},
   }))
 }
 
@@ -36,8 +36,8 @@ function emptyWorkspaces() {
   }))
 }
 
-function noPendingInteraction() {
-  return bindSnapshotSelector(createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()))
+function emptySessionStatuses() {
+  return bindSnapshotSelector(createSnapshotStore<SessionStatusSnapshot>(new Map()))
 }
 
 // The resource hook the resources plugin merges into GlobalStandardProps; this row reads no address.
@@ -49,8 +49,9 @@ function mount() {
   const props: CompletionSoundRowProps = {
     usePanelInfo: selector => selector({ activePanelId: null }),
     useSessions: emptySessions(),
-    useSessionPendingInteraction: noPendingInteraction(),
+    useSessionStatus: emptySessionStatuses(),
     useWorkspaces: emptyWorkspaces(),
+    useSessionRetainInfo: () => undefined,
     useResource,
     useCompletionSound: bindSnapshotSelector(preference.enabled),
     useCompletionSoundTone: bindSnapshotSelector(preference.tone),
@@ -67,8 +68,9 @@ function mountVolume() {
   const props: CompletionSoundVolumeRowProps = {
     usePanelInfo: selector => selector({ activePanelId: null }),
     useSessions: emptySessions(),
-    useSessionPendingInteraction: noPendingInteraction(),
+    useSessionStatus: emptySessionStatuses(),
     useWorkspaces: emptyWorkspaces(),
+    useSessionRetainInfo: () => undefined,
     useResource,
     useCompletionSoundVolume: bindSnapshotSelector(preference.volume),
     setCompletionSoundVolume: (value) => { preference.setVolume(value) },

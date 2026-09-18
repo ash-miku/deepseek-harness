@@ -11,17 +11,29 @@ const NOW = 1_800_000_000_000
 const sid = (id: string) => id as SessionId
 const summary = (id: string, updatedAt: number, overrides: Partial<SessionSummary> = {}): SessionSummary => ({
   id: sid(id), displayTitle: id, running: false, blank: false, updatedAt, ...overrides,
+  retainedBy: overrides.retainedBy ?? {},
 })
-const state = (items: readonly SessionSummary[], overrides: Partial<SessionListState> = {}): SessionListState => ({
-  ids: items.map(item => item.id),
-  byId: Object.fromEntries(items.map(item => [item.id, item])),
-  current: undefined,
-  phase: 'ready',
-  subagentsByParent: {},
-  jobsBySession: {},
-  currentAddress: undefined,
-  ...overrides,
-})
+const state = (
+  items: readonly SessionSummary[],
+  overrides: Partial<SessionListState> & { main?: SessionId } = {},
+): SessionListState => {
+  const { main, ...stateOverrides } = overrides
+  const base: SessionListState = {
+    ids: items.map(item => item.id),
+    byId: Object.fromEntries(items.map(item => [item.id, item])),
+    phase: 'ready',
+    subagentsByParent: {},
+    jobsBySession: {},
+    ...stateOverrides,
+  }
+  if (main === undefined) return base
+  const row = base.byId[main]
+  if (row === undefined) return base
+  return {
+    ...base,
+    byId: { ...base.byId, [main]: { ...row, retainedBy: { ...row.retainedBy, mainView: 1 } } },
+  }
+}
 
 describe('selectInactiveSessions', () => {
   it('keeps the fixed threshold options and returns old idle top-level sessions', () => {
@@ -37,7 +49,7 @@ describe('selectInactiveSessions', () => {
 
     expect(selectInactiveSessions(state([
       current, running, pending, blank, subagent, archivedOld, recent, eligible,
-    ], { current: sid('current') }), [sid('archived')], [sid('pending')], NOW, 30)).toEqual([sid('eligible')])
+    ], { main: sid('current') }), [sid('archived')], [sid('pending')], NOW, 30)).toEqual([sid('eligible')])
   })
 
   it('applies the whole-day cutoff with the threshold boundary exclusive', () => {

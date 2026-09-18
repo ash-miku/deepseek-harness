@@ -50,6 +50,18 @@ describe('PlanChip', () => {
     expect(activeChip().textContent).toBe('Plan')
   })
 
+  it('renders the close mark only while plan mode is the effective target', () => {
+    setup({ active: false, pending: false })
+    expect(inactiveChip().textContent).toBe('Plan')
+    expect(inactiveChip().querySelector('svg')).toBeNull()
+    cleanup()
+    setup({ active: true, pending: false })
+    expect(activeChip().querySelector('svg')).not.toBeNull()
+    cleanup()
+    setup({ active: false, pending: true })
+    expect(activeChip().querySelector('svg')).not.toBeNull()
+  })
+
   it('renders an inactive Plan entry and enters plan mode on click', async () => {
     const setPlanMode = vi.fn(() => Promise.resolve<string | null>(null))
     const { store } = setup({ active: false, pending: false }, setPlanMode)

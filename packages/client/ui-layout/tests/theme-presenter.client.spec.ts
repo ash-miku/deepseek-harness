@@ -1,18 +1,24 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import type { ThemePreference, ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import {
-  CONTENT_FONT_SIZE_VARIABLE, CONTENT_FONT_WEIGHT_VARIABLE, DARK_ATTRIBUTE, ThemePresenter,
+  CONTENT_FONT_SIZE_VARIABLE, CONTENT_FONT_WEIGHT_VARIABLE, DARK_ATTRIBUTE, THEME_SOURCE_ATTRIBUTE, ThemePresenter,
 } from '@deepseek-ai/dsh-client-ui-layout/src/client/theme-presenter.ts'
 
 const LIGHT_THEME_COLOR = 'rgb(255, 255, 255)'
 const DARK_THEME_COLOR = 'rgb(21, 21, 23)'
 
-function snapshot(colorScheme: 'light' | 'dark', tokens: Record<string, string> = {}, fontSize = 14, fontWeight: 400 | 500 | 600 = 500): ThemeSnapshot {
+function snapshot(
+  colorScheme: 'light' | 'dark',
+  tokens: Record<string, string> = {},
+  fontSize = 14,
+  preference: ThemePreference = colorScheme,
+  fontWeight: 400 | 500 | 600 = 500,
+): ThemeSnapshot {
   // The presenter must key off colorScheme, not the id — keep them distinct.
   const active = { id: `${colorScheme}-test`, colorScheme, tokens }
-  return { preference: colorScheme, fontSize, fontWeight, active, themes: [active], revision: 1 }
+  return { preference, fontSize, fontWeight, active, themes: [active], revision: 1 }
 }
 
 function clearThemePresentation(): void {
@@ -26,6 +32,7 @@ function themeColorMeta(): HTMLMetaElement | null {
 beforeEach(() => {
   clearThemePresentation()
   document.documentElement.style.removeProperty('color-scheme')
+  document.documentElement.removeAttribute(THEME_SOURCE_ATTRIBUTE)
   document.body.removeAttribute(DARK_ATTRIBUTE)
   document.body.removeAttribute('style')
   const style = document.createElement('style')
@@ -75,9 +82,9 @@ describe('ThemePresenter', () => {
 
   it('projects the persisted font weight onto the body and updates on change', () => {
     const presenter = new ThemePresenter()
-    presenter.apply(snapshot('dark', {}, 14, 400))
+    presenter.apply(snapshot('dark', {}, 14, 'dark', 400))
     expect(document.body.style.getPropertyValue(CONTENT_FONT_WEIGHT_VARIABLE)).toBe('400')
-    presenter.apply(snapshot('dark', {}, 14, 600))
+    presenter.apply(snapshot('dark', {}, 14, 'dark', 600))
     expect(document.body.style.getPropertyValue(CONTENT_FONT_WEIGHT_VARIABLE)).toBe('600')
   })
 
@@ -90,6 +97,16 @@ describe('ThemePresenter', () => {
     expect(document.body.style.getPropertyValue('--dsw-alias-bg')).toBe('#fff')
     // The old theme's extra variable is gone, not merged.
     expect(document.body.style.getPropertyValue('--dsw-alias-fg')).toBe('')
+  })
+
+  it('publishes the theme source: system stays system, fixed preferences publish the resolved scheme', () => {
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('dark', {}, 14, 'system'))
+    expect(document.documentElement.getAttribute(THEME_SOURCE_ATTRIBUTE)).toBe('system')
+    presenter.apply(snapshot('dark'))
+    expect(document.documentElement.getAttribute(THEME_SOURCE_ATTRIBUTE)).toBe('dark')
+    presenter.dispose()
+    expect(document.documentElement.hasAttribute(THEME_SOURCE_ATTRIBUTE)).toBe(false)
   })
 
   it('dispose removes color-scheme, the attribute, the font-size axis, and every applied variable, sparing foreign inline styles', () => {

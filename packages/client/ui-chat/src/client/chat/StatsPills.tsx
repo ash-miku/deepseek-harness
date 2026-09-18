@@ -330,12 +330,12 @@ export const StatsPills = memo(function StatsPills({ useChat, useProjection, t, 
   // billing (e.g. every request failed) shows its counts without a usage pill.
   const hasTokens = usage !== undefined
     && (billedInputTokens(usage) > 0 || usage.outputTokens > 0)
+  // Additional workspace statistics (uncommitted Git totals) contribute
+  // through the conversation.composer.dock.stats child slot.
   const extraStats = renderSlot('conversation.composer.dock.stats', { selectView })
   if (stats.steps === 0 && !hasTokens && extraStats == null) return null
-  // data-composer-stats: InputBar's `.root:has([data-composer-stats])` rule
-  // tightens the composer's bottom clearance only while this row renders.
   return (
-    <div className={css.root} data-composer-stats>
+    <div className={css.root}>
       {stats.steps > 0 && (
         <TimePill
           stats={stats}

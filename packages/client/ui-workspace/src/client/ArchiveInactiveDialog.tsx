@@ -20,25 +20,25 @@ const DEFAULT_ARCHIVE_DAYS = 30
  * @param props.open - whether the modal is visible.
  * @param props.onClose - dismiss the modal; ignored while archiving.
  * @param props.useSessions - the standard session list hook.
- * @param props.useSessionPendingInteraction - the Session-owned pending-interaction hook.
+ * @param props.useSessionStatus - the unified Session UI status hook; rows with a pending interaction are excluded.
  * @param props.archivedSessionIds - registry-global archive set.
  * @param props.archiveSession - one-session archive action.
  * @param props.t - workspace locale seat.
  * @returns the modal tree.
  */
 export function ArchiveInactiveDialog({
-  open, onClose, useSessions, useSessionPendingInteraction, archivedSessionIds, archiveSession, t,
+  open, onClose, useSessions, useSessionStatus, archivedSessionIds, archiveSession, t,
 }: {
   open: boolean
   onClose: () => void
   useSessions: WorkspaceBrowserProps['useSessions']
-  useSessionPendingInteraction: WorkspaceBrowserProps['useSessionPendingInteraction']
+  useSessionStatus: WorkspaceBrowserProps['useSessionStatus']
   archivedSessionIds: readonly SessionId[]
   archiveSession: WorkspaceBrowserProps['archiveSession']
   t: WorkspaceBrowserProps['t']
 }) {
   const list = useSessions(state => state)
-  const pendingInteractions = useSessionPendingInteraction(state => state)
+  const statuses = useSessionStatus(state => state)
   const [days, setDays] = useState(DEFAULT_ARCHIVE_DAYS)
   const [busy, setBusy] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -50,8 +50,9 @@ export function ArchiveInactiveDialog({
     setResult(null)
   }, [open])
   const pendingSessionIds = useMemo(
-    () => [...pendingInteractions.keys()],
-    [pendingInteractions],
+    () => [...statuses].flatMap(([id, status]) =>
+      status.pendingInteraction === undefined ? [] : [id]),
+    [statuses],
   )
   const candidates = useMemo(
     () => selectInactiveSessions(list, archivedSessionIds, pendingSessionIds, Date.now(), days),

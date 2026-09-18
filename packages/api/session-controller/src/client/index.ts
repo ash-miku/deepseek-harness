@@ -2,9 +2,9 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent/types'
-import type { ConnectionHandle, ConnectionState } from '@deepseek-ai/dsh-client-connection/client'
-import type {} from '@deepseek-ai/dsh-client-connection/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-file-upload/client'
+import { typertOwnedValue } from '@deepseek-ai/dsh-typert-protocol'
 import { createSessionControlStream } from './transport.ts'
 import { ClientSessions } from './sessions/service.ts'
 import type { SessionRemotes } from './sessions/remotes.ts'
@@ -49,7 +49,9 @@ export type {
   SessionFace,
   SubmissionHandle,
 } from './contract/session.ts'
-export type { ISessions } from './contract/sessions.ts'
+export type {
+  ISessions, SessionReference, SessionRetainInfo, SessionRetainOptions, SessionTarget,
+} from './contract/sessions.ts'
 export { MutableSessionEventSource } from './contract/events.ts'
 export type {
   AssistantLiveChunkEvent,
@@ -71,9 +73,19 @@ export type {
   PendingSubmissionImageAttachment,
   PendingSubmissionPlacement,
   PromptError,
-  QueuedMessage,
   SessionSnapshot,
 } from './contract/snapshot.ts'
+
+/** Consumer-owned reference labels; extend this map through the package's canonical /client entry. */
+export interface SessionReferenceSourceMap {
+  /** Temporary Client Controller work, including fork-title preparation. */
+  controllerOperation: unknown
+  /** A Client Gateway invocation's synchronous Context ownership. */
+  gateway: unknown
+}
+
+/** Declaration-merge-extensible labels carried by independent Client references. */
+export type SessionReferenceSource = Extract<keyof SessionReferenceSourceMap, string>
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -111,6 +123,7 @@ export const inject = [
  */
 export function apply(ctx: Context): void {
   const remotes = ctx.remote as unknown as SessionRemotes
+  const connection = ctx.get('connection') as ConnectionHandle
   const sessions = new ClientSessions(ctx, remotes)
   ctx.remote.$on('api-session/added', (summary) => { sessions.handleSessionAdded(summary) })
   ctx.remote.$on('api-session/removed', (sessionId) => { sessions.handleSessionRemoved(sessionId) })
@@ -128,30 +141,27 @@ export function apply(ctx: Context): void {
     accept: (frame) => { sessions.handleControlFrame(frame) },
     failed: (error) => { console.error('[session-controller] control stream failed:', error) },
   })
-  control.start()
-  ctx.on('connection/reset', () => { sessions.handleConnected() })
-  // `connection/reset` fires on every established generation but has no loss
-  // counterpart, and Connection stays independent of downstream domain state:
-  // the recovery-lifecycle source is the official observation point for loss.
-  // The browser-side Connection service resolves through `ctx.get`: the
-  // client bundle declares no `Context.connection` augmentation (that name
-  // belongs to the host-side transport).
-  const connection = ctx.get('connection') as ConnectionHandle
-  let connectionState: ConnectionState | undefined = connection.state.getSnapshot()
-  if (connectionState === 'disconnected') sessions.handleDisconnected()
-  ctx.effect(() => connection.state.subscribe(() => {
-    const state = connection.state.getSnapshot()
-    if (state === connectionState) return
-    connectionState = state
-    if (state === 'disconnected') sessions.handleDisconnected()
-  }), 'session-controller.client.connectionState')
+  const connected = (): void => {
+    if (connection.generation.getSnapshot() === undefined) {
+      sessions.handleDisconnected()
+      return
+    }
+    // A ready control baseline may arrive before Cordis delivers connection/reset.
+    sessions.handleConnected()
+    control.restart()
+    control.start()
+  }
+  ctx.effect(() => connection.generation.subscribe(connected), 'session-controller.client.generation')
   // The baseline retry is process-local work, so a disposed client must not
   // pull against an inactive context: losing the generation also cancels it.
   ctx.effect(() => () => { sessions.handleDisconnected() }, 'session-controller.client.baselineRetry')
-  if (ctx.remote.$host.home !== undefined) sessions.handleConnected()
+  connected()
   ctx.typert.contexts.registerClient('agent', {
-    identity: candidate => sessions.scopeOf(candidate),
-    resolve: sessionId => sessions.resolveAgentScope(sessionId),
+    identity: candidate => sessions.sessionOf(candidate)?.sessionId,
+    resolve: (sessionId) => {
+      const reference = sessions.retainAgentScope(sessionId)
+      return typertOwnedValue(reference.binding.ctx, () => { reference.release() })
+    },
   })
   ctx.effect(() => async () => { await control.dispose() }, 'session-controller.client.control')
 }

@@ -1,187 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
+import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
 import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import css from './ConversationRoot.module.css'
 
-type ConversationContentProps = Omit<ConversationSlotProps, 'useSession' | 'useConversation'> & {
-  session: SessionSnapshot | undefined
-  phase: 'settling' | 'hero' | 'active'
-  hero: boolean
-  onHandleStart: () => number
-  onHandleDrag: (width: number) => void
-  onHandleCommit: (width: number) => void
-  onHandleEnd: () => void
+function ConversationSessionView({ renderSlot }: ConversationViewsProps) {
+  return renderSlot('conversation.session', {})
 }
 
-/** One transcript width handle: pointer capture + rAF-throttled symmetric
- * resize (both sides write the one centered width, so outward travel widens
- * by 2× the pointer distance). The strip itself is pointer-transparent so a
- * wheel over it chains to the transcript scrollport natively — the platform's
- * own (compositor) scrolling rather than a main-thread \`scrollTop\` write, which
- * is what made the pass-through feel choppy. The gesture and the resize cursor
- * therefore live on the enclosing band and hit-test the strip's box.
- * pointermove publishes the pointer's Y as a CSS variable so the glow indicator
- * rides it. Coarse pointers keep the strip interactive (touch-action: none)
- * because they have no wheel to pass through. Mirrors ui-layout AppFrame's
- * DragHandle capture model. */
-function WidthHandle(props: {
-  side: 'left' | 'right'
-  onStart: () => number
-  onDrag: (width: number) => void
-  onCommit: (width: number) => void
-  onEnd: () => void
-}) {
-  const [dragging, setDragging] = useState(false)
-  const base = useRef(0)
-  const origin = useRef(0)
-  const latest = useRef(0)
-  const frame = useRef<number | null>(null)
-  const capture = useRef<{ element: HTMLElement; id: number } | null>(null)
-  const hovering = useRef(false)
-  const callbacks = useRef(props)
-  callbacks.current = props
-  const handleRef = useRef<HTMLDivElement | null>(null)
-
-  const outwardWidth = () => {
-    const dx = latest.current - origin.current
-    const outward = callbacks.current.side === 'right' ? dx : -dx
-    return base.current + outward * 2
-  }
-
-  // The gesture listens on the enclosing band instead of the strip: the strip
-  // is pointer-events: none so the wheel reaches the scrollport, which also
-  // means it can own neither hover nor the resize cursor. One listener set per
-  // handle hit-tests that handle's box; only the handle whose hover state
-  // changes touches the shared band cursor.
-  useEffect(() => {
-    const handle = handleRef.current
-    /* v8 ignore next -- the ref is attached by effect time: the handle renders unconditionally. */
-    if (handle === null) return
-    const surface = handle.parentElement
-    /* v8 ignore next -- the strip always renders inside the conversation band. */
-    if (surface === null) return
-
-    const boxOf = (): DOMRect => handle.getBoundingClientRect()
-    const within = (clientX: number): boolean => {
-      const box = boxOf()
-      return clientX >= box.left && clientX <= box.right
-    }
-    const paint = (clientY: number): void => {
-      handle.style.setProperty('--dsh-width-handle-pointer-y', `${clientY - boxOf().top}px`)
-    }
-    const cancelFrame = (): void => {
-      if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
-    }
-    const setHover = (hover: boolean): void => {
-      hovering.current = hover
-      if (hover) handle.dataset.hover = ''
-      else delete handle.dataset.hover
-      surface.style.cursor = hover ? 'col-resize' : ''
-    }
-    const endDrag = (): void => {
-      const active = capture.current
-      if (active === null) return
-      capture.current = null
-      cancelFrame()
-      if (active.element.hasPointerCapture(active.id)) active.element.releasePointerCapture(active.id)
-      setDragging(false)
-      callbacks.current.onEnd()
-    }
-
-    const onPointerDown = (event: PointerEvent): void => {
-      if (event.button !== 0 || capture.current !== null || !within(event.clientX)) return
-      // Capture phase: the transparent strip lets the press fall through to the
-      // transcript, so stop it here to keep a resize from selecting text or
-      // activating the row underneath.
-      event.preventDefault()
-      event.stopPropagation()
-      surface.setPointerCapture(event.pointerId)
-      capture.current = { element: surface, id: event.pointerId }
-      origin.current = event.clientX
-      latest.current = event.clientX
-      base.current = callbacks.current.onStart()
-      setHover(true)
-      setDragging(true)
-    }
-    const onPointerMove = (event: PointerEvent): void => {
-      if (capture.current?.id === event.pointerId) {
-        paint(event.clientY)
-        latest.current = event.clientX
-        frame.current ??= requestAnimationFrame(() => {
-          frame.current = null
-          callbacks.current.onDrag(outwardWidth())
-        })
-        return
-      }
-      const inside = within(event.clientX)
-      if (inside) paint(event.clientY)
-      if (inside !== hovering.current) setHover(inside)
-    }
-    const onPointerUp = (event: PointerEvent): void => {
-      if (capture.current?.id !== event.pointerId) return
-      latest.current = event.clientX
-      // Only a gesture with actual travel commits: a press-and-release on a
-      // window-clamped width must not overwrite the wider stored preference
-      // with the clamped display value.
-      if (latest.current !== origin.current) callbacks.current.onCommit(outwardWidth())
-      endDrag()
-      // onEnd republished from storage and may have moved the strip; re-test
-      // the release point so the glow and cursor do not stick on.
-      setHover(within(event.clientX))
-    }
-    // Releasing outside the window delivers pointercancel (or drops the capture
-    // silently) instead of pointerup; endDrag abandons the gesture uncommitted
-    // and onEnd republishes the stored preference.
-    const onPointerCancel = (event: PointerEvent): void => {
-      if (capture.current?.id !== event.pointerId) return
-      endDrag()
-      setHover(within(event.clientX))
-    }
-    const onPointerLeave = (): void => {
-      if (capture.current === null && hovering.current) setHover(false)
-    }
-
-    surface.addEventListener('pointerdown', onPointerDown, true)
-    surface.addEventListener('pointermove', onPointerMove)
-    surface.addEventListener('pointerup', onPointerUp)
-    surface.addEventListener('pointercancel', onPointerCancel)
-    surface.addEventListener('pointerleave', onPointerLeave)
-    return () => {
-      surface.removeEventListener('pointerdown', onPointerDown, true)
-      surface.removeEventListener('pointermove', onPointerMove)
-      surface.removeEventListener('pointerup', onPointerUp)
-      surface.removeEventListener('pointercancel', onPointerCancel)
-      surface.removeEventListener('pointerleave', onPointerLeave)
-      surface.style.cursor = ''
-    }
-  }, [])
-
-  return (
-    <div
-      ref={handleRef}
-      className={css.widthHandle}
-      data-side={props.side}
-      data-width-handle={props.side}
-      data-dragging={dragging || undefined}
-    />
-  )
+function NoConversationWidthControls() {
+  return null
 }
 
 /**
- * Render the existing Conversation body, Composer, and width handles.
- * @param props - original Conversation seats plus MainPanel-derived phase and width callbacks.
- * @returns the unchanged Conversation body subtree.
+ * Render the shared Conversation body and its occurrence-selected local Components.
+ * @param props - Factory input, standard Session sources, and Conversation seats.
+ * @returns the Conversation view, Composer, and optional width controls.
  */
-export function ConversationContent({
-  sessionId, session, phase, hero, useSessions, useSessionPendingInteraction,
-  useWorkspaces, useInput, useComposerBlock, renderSlot, renderSlotChain,
-  selectWorkspace, t, onHandleStart, onHandleDrag, onHandleCommit, onHandleEnd,
-}: ConversationContentProps) {
-  const pendingInteraction = useSessionPendingInteraction(snapshot =>
-    sessionId === undefined ? undefined : snapshot.get(sessionId))
+export function ConversationContent(props: ConversationContentProps) {
+  const {
+    sessionId, phase, hero, useSession, useSessions, useSessionStatus,
+    useWorkspaces, useInput, useComposerBlock, renderSlot, renderSlotChain,
+    selectWorkspace, t, useFactorySlot,
+  } = props
+  const session = useSession(snapshot => snapshot)
+  const Views = useFactorySlot('views', ConversationSessionView)
+  const WidthControls = useFactorySlot('widthControls', NoConversationWidthControls)
+  const [body, setBody] = useState<HTMLDivElement | null>(null)
+  const pendingInteraction = useSessionStatus(snapshot =>
+    sessionId === undefined ? undefined : snapshot.get(sessionId)?.pendingInteraction)
   const inputState = useInput(s => s)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
   const workspaces = useWorkspaces(s => s)
@@ -332,23 +180,17 @@ export function ConversationContent({
   )
 
   return (
-    <div className={css.body}>
+    <div
+      ref={setBody}
+      className={clsx(css.body, props.variant === 'embedded' && css.embeddedBody)}
+      data-conversation-content=""
+      data-content-phase={phase}
+    >
       <div className={css.scrollBody} data-conversation-scroll="">
-        {sessionId === undefined ? null : renderSlot('conversation.session', {})}
+        {sessionId === undefined ? null : <Views />}
         {composerSeat}
       </div>
-      {/* Width handles only while a transcript is on screen; the hero has no
-          content column to size. */}
-      {phase === 'active' && (['left', 'right'] as const).map(side => (
-        <WidthHandle
-          key={side}
-          side={side}
-          onStart={onHandleStart}
-          onDrag={onHandleDrag}
-          onCommit={onHandleCommit}
-          onEnd={onHandleEnd}
-        />
-      ))}
+      <WidthControls container={body} phase={phase} />
     </div>
   )
 }
