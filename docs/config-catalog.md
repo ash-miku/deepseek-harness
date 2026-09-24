@@ -580,10 +580,15 @@ export interface Config {
   preference: Volatile<ThemePreference>
   /** Browser font size in pixels. */
   fontSize: Volatile<number>
+  /** Browser interface font weight. */
+  fontWeight: Volatile<ThemeFontWeight>
 }
 
 /** Theme preference persisted by the product Appearance row. */
 export type ThemePreference = typeof THEME_PREFERENCES[number]
+
+/** Base font weight persisted by the product Font-weight row. */
+export type ThemeFontWeight = typeof FONT_WEIGHTS[number]
 ```
 
 Depends on: `Volatile` (`@deepseek-ai/cordis`)
