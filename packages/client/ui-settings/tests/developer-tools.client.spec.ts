@@ -66,17 +66,27 @@ describe('developer tools settings', () => {
   it('shares one remote-browser preference across consumers and disposes it with the plugin', async () => {
     const ctx = new Context()
     onTestFinished(() => ctx.fiber.dispose())
-    const describeCall = vi.fn()
-    const remote = new TestRemote(ctx, { settings: { describe: describeCall } })
+    // A non-loopback page starts on Host persistence and probes the trust
+    // fence; the refusal downgrades it to process-local memory, which every
+    // consumer then shares.
+    const probe = Promise.withResolvers<never>()
+    const describeCall = vi.fn(() => probe.promise)
+    const mutate = vi.fn()
+    const remote = new TestRemote(ctx, { settings: { describe: describeCall, mutate } })
     remote.$host = { home: undefined, isLoopback: false }
     const fiber = ctx.plugin({ inject, apply: clientApply })
     await fiber.await()
     const preference = ctx.configForms.developerTools
     expect(fiber.ctx.configForms.developerTools.enabled).toBe(preference.enabled)
-    // The checkout's trust-fence probe keeps a remote browser on Host persistence,
-    // so the preference starts unset and the page defers its Host read.
+    // An unanswered probe is still Host persistence: no accepted value exists.
+    await vi.waitFor(() => { expect(describeCall).toHaveBeenCalledOnce() })
     expect(preference.enabled.getSnapshot()).toBe(false)
-    expect(describeCall).not.toHaveBeenCalled()
+    probe.reject(new Error('transport failure for /api/settings.describe: HTTP 403'))
+    await vi.waitFor(() => { expect(preference.enabled.getSnapshot()).toBe(true) })
+    // Process-local mode owns the choice from here: it moves without a write.
+    await preference.setEnabled(false)
+    expect(preference.enabled.getSnapshot()).toBe(false)
+    expect(mutate).not.toHaveBeenCalled()
     await fiber.dispose()
     expect(ctx.get('configForms')).toBeUndefined()
   })
