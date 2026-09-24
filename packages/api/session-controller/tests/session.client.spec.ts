@@ -154,6 +154,19 @@ describe('live event path', () => {
     expect(session.eventSource.getSnapshot()).toBe(before)
   })
 
+  it('announces a completed live turn and stays silent for other turn endings', async ({ mock, start }) => {
+    const session = await opened(mock, start)
+    const client = await start()
+    session.bindScope(client.ctx)
+    const announced: number[] = []
+    client.ctx.on('session/completed', (_sessionId, seq) => { announced.push(seq) })
+    // Tail is seq 5, so seq 6 is the first live turn/end.
+    await pushEvent(mock, ev.turnEnd(SessionSeq(6), 1))
+    expect(announced).toEqual([6])
+    await pushEvent(mock, ev.turnEnd(SessionSeq(7), 1, 'aborted'))
+    expect(announced).toEqual([6])
+  })
+
   it('keeps the authoritative host blank bit across unrelated log events', async ({ mock, start }) => {
     const session = await opened(mock, start, [])
     session.handleBlank(true)

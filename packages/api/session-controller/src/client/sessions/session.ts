@@ -7,7 +7,7 @@ import type { AttachmentIdType, FileAttachmentRef, ImageAttachmentRef } from '@d
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { UserMessage } from '@deepseek-ai/dsh-llm/types'
-import { SessionLogOffset, SessionSeq, type SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionLogOffset, SessionSeq, type SessionEvent, type SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionEventStream } from '../transport.ts'
 import type { SessionJournalChange } from '../transport.ts'
 import type {
@@ -147,6 +147,8 @@ export class Session implements SessionFace {
   }>()
   /** Owns the addressed page/follow lifecycle while this Session is open. */
   private events: SessionEventStream | undefined
+  /** Highest completed `turn/end` seq already published on `session/completed`. */
+  private completedTurnSeq = 0
 
   /**
    * Per-session projection value store (push model; see the session-projection
@@ -752,12 +754,29 @@ export class Session implements SessionFace {
     const event = entry.event
     const awaitingFirstTurn = this.firstPromptPendingTurn
     if (event.type === 'turn/start') this.firstPromptPendingTurn = false
+    this.observeCompletedTurn(event)
     this.eventSource.append(entry)
     // After the feed append: the conversation assembly's animation frame is
     // registered by the feed subscribers above, so the echo-retirement frame
     // scheduled here always runs after the durable node became renderable.
     this.observeSubmissionEvent(event)
     return awaitingFirstTurn !== this.firstPromptPendingTurn
+  }
+
+  /**
+   * Publish the completed-Turn edge features react to (the completion sound).
+   * Only a durable `turn/end` whose reason is the Host's successful
+   * `completed` counts: cancellation, failure, and interruption stay silent.
+   * The seq watermark keeps a re-appended live event from ringing twice.
+   * @param event - the stream-validated live event just appended.
+   */
+  private observeCompletedTurn(event: SessionEvent): void {
+    if (event.type !== 'turn/end') return
+    if (event.data.reason.kind !== 'completed') return
+    const seq = event.seq
+    if (seq <= this.completedTurnSeq) return
+    this.completedTurnSeq = seq
+    this.actx?.emit(this.actx, 'session/completed', this.sessionId, seq)
   }
 
   /** Observe durable acceptance even when insertion and claim share one projection notification. */
