@@ -38,6 +38,7 @@ import {
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { AnimatedRows } from './AnimatedRows.tsx'
 import { FLAT_SESSION_ORDER_KEY, type SessionGroupBy } from '../stores.ts'
+import { ArchiveInactiveDialog } from '../ArchiveInactiveDialog.tsx'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
 import css from './WorkspaceBrowser.module.css'
 
@@ -822,6 +823,7 @@ export function WorkspaceBrowser({
   deleteWorkspace,
   insertWorkspaceBefore,
   unarchiveSession,
+  archiveSession,
   createWorkspace,
   searchSessions,
   searchResultLimit,
@@ -836,6 +838,7 @@ export function WorkspaceBrowser({
   const workspaces = useWorkspaces(state => state.items)
   const workspacePhase = useWorkspaces(state => state.phase)
   const workspaceStreamState = useWorkspaces(state => state.state)
+  const [archiveInactiveOpen, setArchiveInactiveOpen] = useState(false)
   const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
   const pinnedSessionIds = useWorkspaces(state => state.pinnedSessionIds)
   // Live occupancy of this surface's directory-flow hole (the same source the
@@ -1216,6 +1219,22 @@ export function WorkspaceBrowser({
               t={t}
             />
           )}
+          {/* Bulk archive is a global sweep, so it stands on its own rather
+              than riding the picking affordance beside it. */}
+          <Tooltip label={t('archiveInactive.action')} side="bottom" delayMs={500}>
+            <button
+              type="button"
+              className={css.iconButton}
+              aria-label={t('archiveInactive.action')}
+              onClick={() => {
+                setWsPickerOpen(false)
+                setSearchExpanded(false)
+                setArchiveInactiveOpen(true)
+              }}
+            >
+              <IconArchiveOutlineRegular size={wide ? 16 : 18} />
+            </button>
+          </Tooltip>
           {/* Adding is the button's one action, so a composition with no
               picking affordance has nothing to offer here: the region hides the
               button rather than leaving a dead one in the header. */}
@@ -1407,6 +1426,17 @@ export function WorkspaceBrowser({
         {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
         {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
       </Modal>
+      {/* Bulk archive commits one archiveSession call per eligible row, so the
+          registry archive API stays the only write path. */}
+      <ArchiveInactiveDialog
+        open={archiveInactiveOpen}
+        onClose={() => { setArchiveInactiveOpen(false) }}
+        useSessions={useSessions}
+        useSessionStatus={useSessionStatus}
+        archivedSessionIds={archivedSessionIds}
+        archiveSession={archiveSession}
+        t={t}
+      />
     </div>
   )
 }

@@ -22,7 +22,7 @@ const state = (
     ids: items.map(item => item.id),
     byId: Object.fromEntries(items.map(item => [item.id, item])),
     phase: 'ready',
-    jobsBySession: {},
+    projectionsBySession: {},
     ...stateOverrides,
   }
   if (main === undefined) return base
