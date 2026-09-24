@@ -26,7 +26,7 @@ const COPY: Record<string, string> = {
 
 function emptySessions() {
   const store = createSnapshotStore<SessionListState>(
-    { ids: [], byId: {}, phase: 'ready', }, jobsBySession: {} })
+    { ids: [], byId: {}, phase: 'ready', jobsBySession: {} })
   return bindSnapshotSelector(store)
 }
 function emptyWorkspaces() {
