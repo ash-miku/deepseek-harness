@@ -91,7 +91,7 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
     private persistence: 'host' | 'memory' | 'probe' = 'host',
   ) {
     this.store = createSnapshotStore<SettingsMirrorSnapshot>({
-      status: persistence === 'memory' ? 'unavailable' : 'idle',
+      status: persistence === 'host' ? 'idle' : 'unavailable',
       view: undefined,
       error: null,
     })

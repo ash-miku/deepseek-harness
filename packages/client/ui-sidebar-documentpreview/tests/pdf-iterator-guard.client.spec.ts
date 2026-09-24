@@ -36,6 +36,7 @@ function reactStub(): Record<string, unknown> {
     cloneElement: (element: unknown) => element,
     createContext: () => ({}),
     createElement: () => ({}),
+    lazy: () => ({}),
     forwardRef: (value: unknown) => value,
     isValidElement: () => false,
     memo: (value: unknown) => value,

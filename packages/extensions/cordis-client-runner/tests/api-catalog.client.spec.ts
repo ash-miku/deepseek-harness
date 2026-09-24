@@ -18,8 +18,6 @@ describe('Client Cordis inspect catalog', () => {
         'delete(workspaceId: WorkspaceId): Promise<void>',
         'archiveSession(sessionId: SessionId, options?: { readonly stopActivity?: boolean }): Promise<void>',
         'unarchiveSession(sessionId: SessionId): Promise<void>',
-        'favoriteSession(sessionId: SessionId): Promise<void>',
-        'unfavoriteSession(sessionId: SessionId): Promise<void>',
         'insertSessionBefore( workspaceId: WorkspaceId, sessionId: SessionId, beforeSessionId?: SessionId, ): Promise<WorkspaceView>',
       ])
     expect(SERVICE_API.find(service => service.key === 'uiWorkspace')?.methods.map(method => method.signature))

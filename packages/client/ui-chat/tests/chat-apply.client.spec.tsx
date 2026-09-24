@@ -102,9 +102,12 @@ describe('Chat apply wiring', () => {
     expect(b.runtime.slots.spec('conversation.chat.node'))
       .toMatchObject({ kind: 'keyed', scope: 'session' })
     expect(b.runtime.slots.entries('conversation.composer.dock').map(row => row.options.id))
-      .toEqual(['stats'])
+      .toEqual(['content', 'stats'])
     expect(b.runtime.slots.entries('settings.general.item').map(row => row.options.id))
-      .toEqual(['transcript-view', 'performance-usage', 'link-opening', 'composer-enter'])
+      .toEqual([
+        'transcript-view', 'performance-usage', 'link-opening', 'composer-enter',
+        'conversation-completion-sound', 'conversation-completion-sound-volume',
+      ])
     await b.runtime.dispose()
   })
 

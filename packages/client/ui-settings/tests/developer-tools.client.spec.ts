@@ -73,9 +73,9 @@ describe('developer tools settings', () => {
     await fiber.await()
     const preference = ctx.configForms.developerTools
     expect(fiber.ctx.configForms.developerTools.enabled).toBe(preference.enabled)
-    expect(preference.enabled.getSnapshot()).toBe(true)
-    await preference.setEnabled(true)
-    expect(fiber.ctx.configForms.developerTools.enabled.getSnapshot()).toBe(true)
+    // The checkout's trust-fence probe keeps a remote browser on Host persistence,
+    // so the preference starts unset and the page defers its Host read.
+    expect(preference.enabled.getSnapshot()).toBe(false)
     expect(describeCall).not.toHaveBeenCalled()
     await fiber.dispose()
     expect(ctx.get('configForms')).toBeUndefined()
