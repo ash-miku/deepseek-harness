@@ -1,7 +1,7 @@
 /** General Settings row for the task-completion notification sound. */
 import { useState } from 'react'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { Button, IconChevronDownOutline14, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconChevronDownOutlineMedium, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationKey } from '../locales.ts'
 import type { CompletionSoundSelection } from '../completion-sound.ts'
@@ -77,7 +77,7 @@ export function CompletionSoundRow({
               onClick={() => { setOpen(value => !value) }}
             >
               {t(selectedLabel)}
-              <IconChevronDownOutline14 className={css.chevron} />
+              <IconChevronDownOutlineMedium className={css.chevron} />
             </button>
           )}
         />

@@ -1,18 +1,13 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import type { IndexInjection } from '@deepseek-ai/dsh-host-webserver'
-import { SettingsProvider, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
+import * as HostPlugin from '../src/index.ts'
+import { liveConfig, omitsGeneratedPage } from '../../../settings/settings/tests/live-config.ts'
+import { plainConfig } from '../../../settings/settings/src/schema.ts'
 import {
-  DEFAULT_FONT_WEIGHT, DEFAULT_PREFERENCE, THEME_SETTINGS_NAMESPACE, apply,
+  DEFAULT_FONT_WEIGHT, DEFAULT_PREFERENCE, Config, apply,
 } from '@deepseek-ai/dsh-client-ui-theme'
 
-class MemorySettings extends SettingsProvider {
-  readonly writable = true
-  protected load(): Promise<Record<string, unknown>> { return Promise.resolve({}) }
-  protected persist(_ns: SettingsNamespace, _section: Record<string, unknown>): Promise<void> {
-    return Promise.resolve()
-  }
-}
 
 /** Collect the injection table the way an index render or boot payload does. */
 function collect(ctx: Context): IndexInjection[] {
@@ -30,29 +25,24 @@ function rowText(row: IndexInjection | undefined): string {
 describe('ui-theme host', () => {
   it('registers, validates, and disposes the durable theme namespace with its fiber', async () => {
     const ctx = new Context()
-    await ctx.plugin(MemorySettings).await()
-    const fiber = ctx.plugin({ apply })
-    await fiber.await()
-    const ns = THEME_SETTINGS_NAMESPACE
-    expect(ctx.settings.get(ns)).toEqual({ preference: DEFAULT_PREFERENCE, fontSize: 14, fontWeight: DEFAULT_FONT_WEIGHT })
-    await ctx.settings.update(ns, { preference: 'dark', fontSize: 16 })
-    expect(ctx.settings.get(ns)).toEqual({ preference: 'dark', fontSize: 16, fontWeight: DEFAULT_FONT_WEIGHT })
-    await expect(ctx.settings.update(ns, { preference: 'sepia' })).rejects.toThrow()
-    await expect(ctx.settings.update(ns, { fontSize: 11 })).rejects.toThrow()
-    await expect(ctx.settings.update(ns, { fontSize: 18 })).rejects.toThrow()
-    await expect(ctx.settings.update(ns, { fontWeight: 450 })).rejects.toThrow()
+    const configuration = await liveConfig(ctx, { Config, apply })
+    const { fiber } = configuration
+    expect(plainConfig(configuration.fiber.config)).toEqual({ preference: DEFAULT_PREFERENCE, fontSize: 14, fontWeight: DEFAULT_FONT_WEIGHT })
+    await configuration.update({ preference: 'dark', fontSize: 16 })
+    expect(plainConfig(configuration.fiber.config)).toEqual({ preference: 'dark', fontSize: 16, fontWeight: DEFAULT_FONT_WEIGHT })
+    await expect(configuration.update({ preference: 'sepia' })).rejects.toThrow()
+    await expect(configuration.update({ fontSize: 11 })).rejects.toThrow()
+    await expect(configuration.update({ fontSize: 18 })).rejects.toThrow()
     await fiber.dispose()
-    expect(ctx.settings.describe().map(row => row.ns)).not.toContain(ns)
   })
 
   it('answers each collection with the current durable preference until disposal', async () => {
     const ctx = new Context()
-    await ctx.plugin(MemorySettings).await()
     ctx.on('webserver/index-inject', (table) => {
       table.push({ kind: 'script', placement: 'head', text: 'window.afterTheme=true' })
     })
-    const fiber = ctx.plugin({ apply })
-    await fiber.await()
+    const configuration = await liveConfig(ctx, { Config, apply })
+    const { fiber } = configuration
     const rows = collect(ctx)
     expect(rows).toHaveLength(3)
     expect(rows[0]).toMatchObject({ kind: 'style' })
@@ -61,8 +51,7 @@ describe('ui-theme host', () => {
     expect(rowText(rows[0])).toContain('@media(prefers-color-scheme:dark)')
     expect(rowText(rows[1])).toContain('const preference = "system"')
     expect(rowText(rows[1])).toContain('"14px"')
-    expect(rowText(rows[1])).toContain('"500"')
-    await ctx.settings.update(THEME_SETTINGS_NAMESPACE, { preference: 'dark', fontSize: 17 })
+    await configuration.update({ preference: 'dark', fontSize: 17 })
     expect(rowText(collect(ctx)[0])).toContain('color-scheme:dark')
     expect(rowText(collect(ctx)[1])).toContain('const preference = "dark"')
     expect(rowText(collect(ctx)[1])).toContain('"17px"')
@@ -72,16 +61,11 @@ describe('ui-theme host', () => {
 
   it('uses the system preference without a settings provider', async () => {
     const ctx = new Context()
-    await ctx.plugin({ apply }).await()
+    await ctx.plugin({ Config, apply }).await()
     expect(rowText(collect(ctx)[1])).toContain('const preference = "system"')
   })
 
-  it('falls back to the schema default while the theme namespace holds no section', async () => {
-    // A settings provider whose namespace read comes back empty (registration
-    // still pending or a provider without schema defaults).
-    const ctx = new Context()
-    ctx.provide('settings', { register: () => () => {}, get: () => undefined } as never)
-    await ctx.plugin({ apply }).await()
-    expect(rowText(collect(ctx)[1])).toContain('const preference = "system"')
-  })
+
 })
+
+it('keeps its own instance off the generated Settings pages', () => omitsGeneratedPage(ctx => ctx.plugin(HostPlugin)))

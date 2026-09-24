@@ -1,7 +1,7 @@
 /** Durable completion-sound preferences. */
 import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   COMPLETION_SOUND_FIELD, COMPLETION_SOUND_TONE_FIELD, COMPLETION_SOUND_VOLUME_FIELD,
   DEFAULT_COMPLETION_SOUND, DEFAULT_COMPLETION_SOUND_TONE, DEFAULT_COMPLETION_SOUND_VOLUME,
@@ -109,12 +109,12 @@ export class CompletionSoundPreference {
   readonly tone: SnapshotStore<CompletionSoundTone> = createSnapshotStore(DEFAULT_COMPLETION_SOUND_TONE)
   /** Reactive application-level volume percentage consumed by the settings row and notifier. */
   readonly volume: SnapshotStore<number> = createSnapshotStore(DEFAULT_COMPLETION_SOUND_VOLUME)
-  private readonly host: SettingsScope<ConversationSettings> | undefined
+  private readonly host: ConfigForm<ConversationSettings> | undefined
 
   /**
    * @param host - durable conversation settings scope; absent compositions stay process-local.
    */
-  constructor(host?: SettingsScope<ConversationSettings>) {
+  constructor(host?: ConfigForm<ConversationSettings>) {
     this.host = host
     if (host !== undefined) {
       host.subscribe(() => { this.adopt(host) })
@@ -166,7 +166,7 @@ export class CompletionSoundPreference {
     void this.host?.set(COMPLETION_SOUND_VOLUME_FIELD, volume)
   }
 
-  private adopt(host: SettingsScope<ConversationSettings>): void {
+  private adopt(host: ConfigForm<ConversationSettings>): void {
     const section = host.getSnapshot().value
     if (section === undefined) return
     if (this.enabled.getSnapshot() !== section.completionSound) {

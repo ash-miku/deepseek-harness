@@ -1,12 +1,4 @@
-/**
- * Plan control plugin, browser half: the composer's named
- * `conversation.input.plan` seat with a visible plan-mode toggle, persistent
- * Chat cards, and Session-backed sidebar previews. Plan mode is entered and
- * left through the same /plan command path; whenever the host projection is
- * present, the chip renders and calls `setPlanMode` through `command.execute`.
- * Reads ride the generic projection pair through the standard-kit
- * `useProjection`; zero client-side plan state.
- */
+/** Plan-mode control, persistent Chat cards, and Session-backed sidebar previews. */
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -50,11 +42,10 @@ const NS = 'plan'
 /** Injected business face of the composer plan seat. */
 export interface PlanChipInjected {
   /**
-   * Enter or leave plan mode by executing /plan or /plan off.
-   * @param active - true to enter plan mode, false to leave it.
+   * Leave plan mode by executing /plan off.
    * @returns null on admitted execution; a user-visible failure line otherwise.
    */
-  setPlanMode: (active: boolean) => Promise<string | null>
+  exitPlanMode: () => Promise<string | null>
 }
 
 /** Services for plan controls, Conversation projection, and resource navigation. */
@@ -127,11 +118,10 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: (sessionId: SessionId): PlanChipInjected => ({
       // Failure strings stay English (error-surface policy: not localized).
-      setPlanMode: async (active) => {
-        const line = active ? '/plan' : '/plan off'
-        const result = await ctx.remote.commands.execute(sessionId, line, [])
+      exitPlanMode: async () => {
+        const result = await ctx.remote.commands.execute(sessionId, '/plan off', [])
         if (!result.ok) return `${result.error.message} (${result.error.code})`
-        if (result.value === undefined) return `unknown command: ${line}`
+        if (result.value === undefined) return 'unknown command: /plan off'
         return null
       },
     }),

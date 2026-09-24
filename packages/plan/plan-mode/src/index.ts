@@ -451,7 +451,7 @@ export class PlanModeController extends Service {
     }).inbox
     if (inbox === undefined) return
     for (const message of [...inbox.nextStep, ...inbox.nextTurn]) {
-      if (message.source.kind === 'plugin' && message.source.plugin === 'plan-mode') {
+      if (message.source.kind === 'plan-mode' && message.source.form === 'notice') {
         inbox.remove(message.id)
       }
     }

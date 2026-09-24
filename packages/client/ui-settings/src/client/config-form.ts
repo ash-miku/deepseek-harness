@@ -270,7 +270,7 @@ export class ConfigForms extends Service {
   readonly developerTools: DeveloperToolsPreference
   private readonly mirror: SettingsDescribeMirror
   private readonly schema: SettingsSchemaService
-  private readonly persistence: 'host' | 'memory'
+  private readonly persistence: 'host' | 'memory' | 'probe'
   /**
    * The PROVIDING fiber, kept because a Service reads `ctx` as its *consumer's*
    * fiber: letting a shared form write through the caller's context would make
@@ -287,7 +287,7 @@ export class ConfigForms extends Service {
   constructor(ctx: Context, config: {
     mirror: SettingsDescribeMirror
     schema: SettingsSchemaService
-    persistence: 'host' | 'memory'
+    persistence: 'host' | 'memory' | 'probe'
   }) {
     super(ctx, 'configForms')
     this.mirror = config.mirror

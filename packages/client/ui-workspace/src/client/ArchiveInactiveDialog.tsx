@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Button, IconChevronDownOutline14, Menu, Modal,
+  Button, IconChevronDownOutlineMedium, Menu, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceBrowserProps } from './contract/slots.ts'
@@ -119,7 +119,7 @@ export function ArchiveInactiveDialog({
               onClick={() => { setMenuOpen(value => !value) }}
             >
               {t('archiveInactive.days', { n: days })}
-              <IconChevronDownOutline14 className={css.archiveChevron} />
+              <IconChevronDownOutlineMedium className={css.archiveChevron} />
             </button>
           )}
         />

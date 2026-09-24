@@ -270,8 +270,8 @@ export function AppFrame({
   const rightbarMax = cols.rightbar === 0 ? 0 : clampWidth(rightbarPreference, RIGHTBAR_MIN, viewport * RIGHTBAR_MAX_RATIO)
   const sidebar = useMemo(() => renderSlot('sidebar', {
     collapsed: sidebarCollapsed,
-    width: cols.sidebar,
-  }), [renderSlot, sidebarCollapsed, cols.sidebar])
+    width: drawer ? drawerWidth : cols.sidebar,
+  }), [renderSlot, sidebarCollapsed, drawer, drawerWidth, cols.sidebar])
   const main = useMemo(() => (
     <MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} />
   ), [usePanelInfo, renderSlot])
@@ -335,10 +335,7 @@ export function AppFrame({
             (collapsed follows the resolved rail, so a derived auto-collapse
             renders the rail UI too). The narrow drawer reports its capped
             width so the occupant renders drawer geometry. */}
-        {renderSlot('sidebar', {
-          collapsed: sidebarCollapsed,
-          width: drawer ? drawerWidth : cols.sidebar,
-        })}
+        {sidebar}
       </div>
       <>
         <CenterColumn>{main}</CenterColumn>

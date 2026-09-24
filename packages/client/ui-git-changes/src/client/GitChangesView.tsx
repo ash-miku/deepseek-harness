@@ -1,7 +1,7 @@
 /** Changes view: workspace Git status and inline/split diff over the Host routes. */
 import { useEffect, useMemo, useState } from 'react'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { IconChevronDownOutline14, Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutlineMedium, Menu, type MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   GIT_DIFF_PATH, GIT_STATUS_PATH,
@@ -183,7 +183,7 @@ export function GitChangesView({ sessionId, t }: ConvViewProps & PropsLocale<'ch
                   >
                     <span className={css.triggerLabel}>{baseLabel}</span>
                     <span className={baseOpen ? `${css.chevron} ${css.chevronOpen}` : css.chevron} aria-hidden>
-                      <IconChevronDownOutline14 />
+                      <IconChevronDownOutlineMedium />
                     </span>
                   </button>
                 }
