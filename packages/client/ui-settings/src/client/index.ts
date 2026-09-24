@@ -1,23 +1,11 @@
-/**
- * Settings domain base plugin, browser half. Provides `ctx.settingsScope`, the
- * settings-namespace scope service every preference row binds its durable
- * section through, and owns the one `settings.describe` reader in the browser:
- * the describe mirror, whose invalidation subscriptions
- * (`settings/document-updated`, `connection/reset`) live here so every derived
- * surface refreshes from a single wire read. It depends on no `ui-*`
- * presentation package, so any feature that owns a preference can reach it:
- * the settings SHELL — the `sidebar.settings` occupant, its navigation, and
- * the chrome — lives in ui-settings-general, because a shell dependency on
- * ui-sidebar would close a reference cycle through ui-layout and ui-theme.
- * Export discipline: packages/client/AGENTS.md.
- */
+/** Shared configuration forms and their Host describe mirror. */
 import type { Context } from '@deepseek-ai/cordis'
 // Type-only: the ctx.remote merge, the fixed Host facts, and the carrier's
 // `connection/reset` lifecycle event, all through the assembly package.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only pair supplying `$on` and its key face without dragging a build
 // artifact into the Host graph (rationale beside the same pair in
-// settings-scope.ts).
+// config-form.ts).
 import type {} from '@deepseek-ai/dsh-api-remotes/types'
 import type {} from '@deepseek-ai/dsh-settings/types'
 // Type-only: the connection handle and its Host generation source, which the
@@ -27,15 +15,15 @@ import type {} from '@deepseek-ai/dsh-settings/types'
 // not carry).
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { SettingsSchemaService } from './schema.ts'
-import { SettingsScopeBinder } from './settings-scope.ts'
+import { ConfigForms } from './config-form.ts'
 import { SettingsDescribeMirror } from './settings-mirror.ts'
 
 export type {
-  SettingsGeneralItemOwnerProps, SettingsHeaderOwnerProps, SettingsOnboardingOwnerProps,
+  SettingsLauncherOwnerProps, SettingsGeneralItemOwnerProps, SettingsHeaderOwnerProps, SettingsOnboardingOwnerProps,
   SettingsPluginsTabOwnerProps, SettingsSectionOwnerProps, SettingsTriggerOwnerProps,
 } from './contract/slots.ts'
-export type { SettingsScopeController, SettingsScopeBinder } from './settings-scope.ts'
-export type { SettingsScope, SettingsScopeSnapshot, SettingsScopeSpec } from './settings-contract.ts'
+export type { ConfigForms } from './config-form.ts'
+export type { ConfigForm, ConfigFormSnapshot } from './config-form-types.ts'
 export type { SettingsSchemaService } from './schema.ts'
 export type { SchemaNode } from './schema.ts'
 export type {
@@ -96,5 +84,5 @@ export function apply(ctx: Context): void {
     void mirror.ensure()
     return () => { for (const dispose of disposers) dispose() }
   }, 'ui-settings: describe mirror invalidations')
-  new SettingsScopeBinder(ctx, { mirror, schema, persistence })
+  new ConfigForms(ctx, { mirror, schema, persistence })
 }

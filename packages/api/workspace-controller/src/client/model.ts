@@ -11,12 +11,13 @@ import type {
   WorkspaceCreateRequest,
   WorkspaceCreateValue,
   WorkspaceDeleteValue,
-  WorkspaceFavoriteSessionRequest,
-  WorkspaceFavoriteValue,
   WorkspaceInsertSessionBeforeRequest,
+  WorkspaceInitializeDefaultRequest,
   WorkspaceOrderValue,
+  WorkspacePinSessionRequest,
+  WorkspacePinValue,
   WorkspaceUnarchiveSessionRequest,
-  WorkspaceUnfavoriteSessionRequest,
+  WorkspaceUnpinSessionRequest,
   WorkspaceValue,
   WorkspaceId,
   WorkspaceView,
@@ -33,11 +34,8 @@ export interface WorkspaceSnapshot {
   readonly items: readonly WorkspaceView[]
   /** Complete registry-global archive set in Host order. */
   readonly archivedSessionIds: WorkspaceArchiveValue['archivedSessionIds']
-  /**
-   * Complete registry-global favorite (pinned) set in favorite order — the
-   * order the Sessions were favorited. Browsing surfaces render these first.
-   */
-  readonly favoriteSessionIds: WorkspaceFavoriteValue['favoriteSessionIds']
+  /** Complete registry-global pin set, most recently pinned first. */
+  readonly pinnedSessionIds: WorkspacePinValue['pinnedSessionIds']
   readonly state: 'idle' | 'loading' | 'error'
   readonly phase: WorkspaceListPhase
   readonly error: RemoteFailure | null
@@ -55,8 +53,8 @@ export interface WorkspaceFollowSink {
   replaceOrder(workspaceIds: readonly WorkspaceId[]): void
   /** Replace the complete archived Session set. */
   replaceArchived(sessionIds: WorkspaceArchiveValue['archivedSessionIds']): void
-  /** Replace the complete favorite (pinned) Session set. */
-  replaceFavorite(sessionIds: WorkspaceFavoriteValue['favoriteSessionIds']): void
+  /** Replace the complete pinned Session set. */
+  replacePinned(pinnedSessionIds: WorkspacePinValue['pinnedSessionIds']): void
 }
 
 /**
@@ -65,7 +63,7 @@ export interface WorkspaceFollowSink {
 export class ClientWorkspaceModel implements WorkspaceFollowSink {
   private items: readonly WorkspaceView[] = []
   private archivedSessionIds: WorkspaceArchiveValue['archivedSessionIds'] = []
-  private favoriteSessionIds: WorkspaceFavoriteValue['favoriteSessionIds'] = []
+  private pinnedSessionIds: WorkspacePinValue['pinnedSessionIds'] = []
   private state: WorkspaceSnapshot['state'] = 'loading'
   private phase: WorkspaceListPhase = 'pending'
   private error: RemoteFailure | null = null
@@ -77,6 +75,8 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   private committedOrder: WorkspaceId[] = []
   /** Latest archive-set request; a later request or a pushed set supersedes it. */
   private archiveRequestSeq = 0
+  /** Latest pin-set request; a later request or a pushed set supersedes it. */
+  private pinRequestSeq = 0
   /** Host Workspace ids are never reused, so delayed data cannot resurrect a removed row. */
   private readonly removedIds = new Set<WorkspaceId>()
   private readonly listeners = new Set<() => void>()
@@ -99,6 +99,20 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   async create(input: WorkspaceCreateRequest): Promise<RemoteResult<WorkspaceCreateValue>> {
     const result = await this.remote.create(input)
     if (result.ok) this.upsert(result.value.workspace)
+    return result
+  }
+
+  /**
+   * Initialize the default Workspace and merge its authoritative row.
+   * @param request - initial directory name and title.
+   * @param signal - caller lifetime.
+   * @returns generated Remote result.
+   */
+  async initializeDefault(
+    request: WorkspaceInitializeDefaultRequest, signal?: AbortSignal,
+  ): Promise<RemoteResult<WorkspaceValue | undefined>> {
+    const result = await this.remote.initializeDefault(request, signal)
+    if (result.ok && result.value !== undefined) this.upsert(result.value.workspace)
     return result
   }
 
@@ -175,15 +189,23 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
    * Archive one Session and install the returned complete archive set.
    * A reply superseded by a later archive request or a pushed set installs nothing.
    * @param sessionId - Session to archive.
+   * @param options - Whether the Host stops the Session's running work instead of refusing.
    * @returns generated Remote result.
    */
   async archiveSession(
     sessionId: WorkspaceArchiveSessionRequest['sessionId'],
+    options: Pick<WorkspaceArchiveSessionRequest, 'stopActivity'> = {},
   ): Promise<RemoteResult<WorkspaceArchiveValue>> {
     const requestSeq = ++this.archiveRequestSeq
-    const result = await this.remote.archiveSession({ sessionId })
+    const result = await this.remote.archiveSession({
+      sessionId,
+      ...(options.stopActivity === true ? { stopActivity: true } : {}),
+    })
     if (result.ok && requestSeq === this.archiveRequestSeq) {
       this.installArchived(result.value.archivedSessionIds)
+      // The Host drops an archived session's pin in the same durable write;
+      // mirror that locally so no frame shows the row both archived and pinned.
+      this.installPinned(this.pinnedSessionIds.filter(id => id !== sessionId))
     }
     return result
   }
@@ -206,28 +228,36 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   }
 
   /**
-   * Favorite (pin) one Session and install the returned complete set.
-   * @param sessionId - Session to favorite.
+   * Pin one Session and install the returned complete pin set.
+   * A reply superseded by a later pin request or a pushed set installs nothing.
+   * @param sessionId - Session to pin.
    * @returns generated Remote result.
    */
-  async favoriteSession(
-    sessionId: WorkspaceFavoriteSessionRequest['sessionId'],
-  ): Promise<RemoteResult<WorkspaceFavoriteValue>> {
-    const result = await this.remote.favoriteSession({ sessionId })
-    if (result.ok) this.installFavorite(result.value.favoriteSessionIds)
+  async pinSession(
+    sessionId: WorkspacePinSessionRequest['sessionId'],
+  ): Promise<RemoteResult<WorkspacePinValue>> {
+    const requestSeq = ++this.pinRequestSeq
+    const result = await this.remote.pinSession({ sessionId })
+    if (result.ok && requestSeq === this.pinRequestSeq) {
+      this.installPinned(result.value.pinnedSessionIds)
+    }
     return result
   }
 
   /**
-   * Unfavorite (unpin) one Session and install the returned complete set.
-   * @param sessionId - Session to unfavorite.
+   * Unpin one Session and install the returned complete pin set.
+   * A reply superseded by a later pin request or a pushed set installs nothing.
+   * @param sessionId - Session to unpin.
    * @returns generated Remote result.
    */
-  async unfavoriteSession(
-    sessionId: WorkspaceUnfavoriteSessionRequest['sessionId'],
-  ): Promise<RemoteResult<WorkspaceFavoriteValue>> {
-    const result = await this.remote.unfavoriteSession({ sessionId })
-    if (result.ok) this.installFavorite(result.value.favoriteSessionIds)
+  async unpinSession(
+    sessionId: WorkspaceUnpinSessionRequest['sessionId'],
+  ): Promise<RemoteResult<WorkspacePinValue>> {
+    const requestSeq = ++this.pinRequestSeq
+    const result = await this.remote.unpinSession({ sessionId })
+    if (result.ok && requestSeq === this.pinRequestSeq) {
+      this.installPinned(result.value.pinnedSessionIds)
+    }
     return result
   }
 
@@ -238,9 +268,10 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   replaceBaseline(baseline: WorkspaceBaseline): void {
     this.orderFrameGeneration++
     this.archiveRequestSeq++
+    this.pinRequestSeq++
     this.installViews(baseline.items)
     this.installArchived(baseline.archivedSessionIds)
-    this.installFavorite(baseline.favoriteSessionIds)
+    this.installPinned(baseline.pinnedSessionIds)
     this.state = 'idle'
     this.phase = 'ready'
     this.error = null
@@ -273,11 +304,12 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   }
 
   /**
-   * Replace the favorite Session set from the current follow generation.
-   * @param favoriteSessionIds - complete Host-confirmed favorite set.
+   * Replace the pinned Session set from the current follow generation.
+   * @param pinnedSessionIds - complete Host-confirmed pin set, most recently pinned first.
    */
-  replaceFavorite(favoriteSessionIds: WorkspaceFavoriteValue['favoriteSessionIds']): void {
-    this.installFavorite(favoriteSessionIds)
+  replacePinned(pinnedSessionIds: WorkspacePinValue['pinnedSessionIds']): void {
+    this.pinRequestSeq++
+    this.installPinned(pinnedSessionIds)
   }
 
   /** Keep the last complete projection visible while a lost carrier reconnects. */
@@ -321,19 +353,13 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
     return {
       items: this.items,
       archivedSessionIds: this.archivedSessionIds,
-      favoriteSessionIds: this.favoriteSessionIds,
+      pinnedSessionIds: this.pinnedSessionIds,
       state: this.state,
       phase: this.phase,
       error: this.error,
     }
   }
 
-  /**
-   * Replace the archive set when membership actually changed. Both carriers
-   * send the complete set in Host order, so positional comparison is exact
-   * rather than merely heuristic, and an unchanged echo stays identity-stable
-   * for downstream Object.is short-circuits.
-   */
   private installArchived(archivedSessionIds: WorkspaceArchiveValue['archivedSessionIds']): void {
     if (archivedSessionIds.length === this.archivedSessionIds.length
       && archivedSessionIds.every((id, index) => id === this.archivedSessionIds[index])) return
@@ -341,10 +367,10 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
     this.invalidate()
   }
 
-  private installFavorite(favoriteSessionIds: WorkspaceFavoriteValue['favoriteSessionIds']): void {
-    if (favoriteSessionIds.length === this.favoriteSessionIds.length
-      && favoriteSessionIds.every((id, index) => id === this.favoriteSessionIds[index])) return
-    this.favoriteSessionIds = [...favoriteSessionIds]
+  private installPinned(pinnedSessionIds: WorkspacePinValue['pinnedSessionIds']): void {
+    if (pinnedSessionIds.length === this.pinnedSessionIds.length
+      && pinnedSessionIds.every((id, index) => id === this.pinnedSessionIds[index])) return
+    this.pinnedSessionIds = [...pinnedSessionIds]
     this.invalidate()
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconCloseFill14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCloseCircleFillRegular, IconPlanOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the ui-conversation SlotMap merge (the input.plan seat and
 // its {locked} owner share).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -12,15 +12,13 @@ export type PlanChipProps =
   PropsRuntime<'conversation.input.plan'> & InjectFace<PlanChipInjected> & PropsLocale<'plan'>
 
 /**
- * Plan-mode toggle over the host-computed `plan` projection. The chip renders
- * whenever plan mode is available (`pending ? !active : active` is the
- * effective target — a folded host value, not client optimism), so inactive
- * sessions expose the same visible Plan affordance as active ones.
+ * Plan-mode status over the host-computed `plan` projection. The chip renders
+ * only while the effective target is plan mode (`pending ? !active : active`
+ * — a folded host value, not client optimism) and executes /plan off.
  */
-export function PlanChip({ useProjection, locked, setPlanMode, t }: PlanChipProps) {
+export function PlanChip({ useProjection, locked, exitPlanMode, t }: PlanChipProps) {
   const plan = useProjection('plan')
-  const [pendingTarget, setPendingTarget] = useState<boolean | null>(null)
-  const [rpcBusy, setRpcBusy] = useState(false)
+  const [leaving, setLeaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const aliveRef = useRef(true)
 
@@ -31,36 +29,22 @@ export function PlanChip({ useProjection, locked, setPlanMode, t }: PlanChipProp
     }
   }, [])
 
-  // Keep the button locked until the host projection confirms the requested
-  // state. Without this, a click landing after the RPC settles but before the
-  // projection frame arrives would toggle from a stale target and send the
-  // wrong /plan command.
-  useEffect(() => {
-    if (plan === undefined || pendingTarget === null) return
-    const target = plan.pending ? !plan.active : plan.active
-    if (target === pendingTarget) setPendingTarget(null)
-  }, [pendingTarget, plan])
-
   if (plan === undefined) return null
   const target = plan.pending ? !plan.active : plan.active
-  const busy = rpcBusy
+  if (!target) return null
 
-  const toggle = (): void => {
-    // No busy/locked guard: both disable the button, so no click arrives.
-    const requested = !target
-    setPendingTarget(requested)
-    setRpcBusy(true)
+  const off = (): void => {
+    // No leaving/locked guard: both disable the button, so no click arrives.
+    setLeaving(true)
     setError(null)
-    void setPlanMode(requested).then((failure) => {
+    void exitPlanMode().then((failure) => {
       if (!aliveRef.current) return
-      if (failure !== null) setPendingTarget(null)
+      setLeaving(false)
       setError(failure)
     }, (reason: unknown) => {
       if (!aliveRef.current) return
-      setPendingTarget(null)
+      setLeaving(false)
       setError(reason instanceof Error ? reason.message : String(reason))
-    }).finally(() => {
-      if (aliveRef.current) setRpcBusy(false)
     })
   }
 
@@ -68,19 +52,17 @@ export function PlanChip({ useProjection, locked, setPlanMode, t }: PlanChipProp
     <span className={css.wrap}>
       <button
         type="button"
-        className={target ? css.chip : css.chipInactive}
-        aria-label={t(target ? 'chip.on.aria' : 'chip.off.aria')}
-        title={t(target ? 'chip.on.title' : 'chip.off.title')}
-        disabled={locked || busy}
-        onClick={toggle}
+        className={css.chip}
+        aria-label={t('chip.on.aria')}
+        title={t('chip.on.title')}
+        disabled={locked || leaving}
+        onClick={off}
       >
-        {/* Inactive is a quiet entry; only the active target carries the close mark. */}
-        <span className={css.label}>{t('chip.label')}</span>
-        {target && (
-          <span className={css.close} aria-hidden>
-            <IconCloseFill14 size={12} />
-          </span>
-        )}
+        <span className={css.glyph} aria-hidden>
+          <IconPlanOutlineRegular className={css.restGlyph} size={14} />
+          <IconCloseCircleFillRegular className={css.hoverGlyph} size={14} />
+        </span>
+        {t('chip.label')}
       </button>
       {error !== null && <span className={css.error} role="status" title={error}>{t('chip.exitFailed')}</span>}
     </span>

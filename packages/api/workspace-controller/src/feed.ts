@@ -49,7 +49,7 @@ export class WorkspaceFeed {
   private knownIds: Set<string>
   private order: readonly string[]
   private archived: readonly string[]
-  private favorite: readonly string[]
+  private pinned: readonly string[]
 
   /** @param ctx - Host context containing the authoritative Workspace registry. */
   constructor(private readonly ctx: Context) {
@@ -57,7 +57,7 @@ export class WorkspaceFeed {
     this.knownIds = new Set(baseline.map(workspace => String(workspace.id)))
     this.order = baseline.map(workspace => String(workspace.id))
     this.archived = ctx.workspaceRegistry.archivedSessionIds.map(String)
-    this.favorite = ctx.workspaceRegistry.favoriteSessionIds.map(String)
+    this.pinned = ctx.workspaceRegistry.pinnedSessionIds.map(String)
     ctx.on('domain/changed', (change: DomainChanged) => { this.changed(change) })
     ctx.effect(() => () => {
       for (const follower of this.followers) follower.close()
@@ -67,13 +67,13 @@ export class WorkspaceFeed {
 
   /**
    * Read the complete current projection synchronously.
-   * @returns all active Workspaces plus the archived and favorite Session identities.
+   * @returns all active Workspaces plus archived and pinned Session identities.
    */
   baseline(): WorkspaceBaseline {
     return {
       items: this.ctx.workspaceRegistry.list().map(workspaceView),
       archivedSessionIds: [...this.ctx.workspaceRegistry.archivedSessionIds],
-      favoriteSessionIds: [...this.ctx.workspaceRegistry.favoriteSessionIds],
+      pinnedSessionIds: [...this.ctx.workspaceRegistry.pinnedSessionIds],
     }
   }
 
@@ -118,10 +118,10 @@ export class WorkspaceFeed {
         this.archived = nextArchived
         this.publish({ type: 'archived', archivedSessionIds: [...state.archivedSessionIds] })
       }
-      const nextFavorite = state.favoriteSessionIds.map(String)
-      if (!sameStrings(this.favorite, nextFavorite)) {
-        this.favorite = nextFavorite
-        this.publish({ type: 'favorite', favoriteSessionIds: [...state.favoriteSessionIds] })
+      const nextPinned = state.pinnedSessionIds.map(String)
+      if (!sameStrings(this.pinned, nextPinned)) {
+        this.pinned = nextPinned
+        this.publish({ type: 'pinned', pinnedSessionIds: [...state.pinnedSessionIds] })
       }
       return
     }

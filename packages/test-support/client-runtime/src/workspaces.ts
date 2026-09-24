@@ -1,7 +1,7 @@
 /** Test-owned workspaces face: the renderer standard-kit observable plus recorded actions. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type {
-  IWorkspaces, WorkspaceId, WorkspaceSnapshot, WorkspaceView,
+  IWorkspaces, WorkspaceId, WorkspaceInitializeDefaultRequest, WorkspaceSnapshot, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -78,6 +78,18 @@ export class TestWorkspaces implements IWorkspaces {
       path: input.path,
       sessionIds: [],
     } as unknown as WorkspaceView
+  }
+
+  /**
+   * Initialize the default Workspace through a test stub; defaults to an ineligible first use.
+   * @param request - initial directory name and title.
+   * @param signal - caller lifetime.
+   * @returns the stubbed Workspace, or undefined when initialization is ineligible.
+   */
+  async initializeDefault(request: WorkspaceInitializeDefaultRequest, signal?: AbortSignal): Promise<WorkspaceView | undefined> {
+    this.calls.push({ method: 'initializeDefault', args: [request, signal] })
+    const stub = this.stubs.get('initializeDefault')
+    return await (stub?.(request, signal) as Promise<WorkspaceView | undefined> | undefined)
   }
 
   /**
@@ -161,36 +173,39 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
-   * Favorite (pin) a session (recorded). The default adds the id to the
-   * list state's favorite set.
-   * @param sessionId - session to favorite.
+   * Pin a session (recorded). The default mirrors the production face's
+   * observable effect: the id leads the list state's pin set.
+   * @param sessionId - session to pin.
    */
-  async favoriteSession(sessionId: SessionId): Promise<void> {
-    this.calls.push({ method: 'favoriteSession', args: [sessionId] })
-    const stub = this.stubs.get('favoriteSession')
+  async pinSession(sessionId: SessionId): Promise<void> {
+    this.calls.push({ method: 'pinSession', args: [sessionId] })
+    const stub = this.stubs.get('pinSession')
     if (stub !== undefined) {
       await (stub(sessionId) as Promise<void>)
       return
     }
     await this.update((draft) => {
-      draft.favoriteSessionIds = [...draft.favoriteSessionIds, sessionId]
+      draft.pinnedSessionIds = [
+        sessionId,
+        ...draft.pinnedSessionIds.filter(id => id !== sessionId),
+      ]
     })
   }
 
   /**
-   * Unfavorite (unpin) a session (recorded). The default removes the id
-   * from the list state's favorite set.
-   * @param sessionId - session to unfavorite.
+   * Unpin a session (recorded). The default mirrors the production face's
+   * observable effect: the id leaves the list state's pin set.
+   * @param sessionId - session to unpin.
    */
-  async unfavoriteSession(sessionId: SessionId): Promise<void> {
-    this.calls.push({ method: 'unfavoriteSession', args: [sessionId] })
-    const stub = this.stubs.get('unfavoriteSession')
+  async unpinSession(sessionId: SessionId): Promise<void> {
+    this.calls.push({ method: 'unpinSession', args: [sessionId] })
+    const stub = this.stubs.get('unpinSession')
     if (stub !== undefined) {
       await (stub(sessionId) as Promise<void>)
       return
     }
     await this.update((draft) => {
-      draft.favoriteSessionIds = draft.favoriteSessionIds.filter(id => id !== sessionId)
+      draft.pinnedSessionIds = draft.pinnedSessionIds.filter(id => id !== sessionId)
     })
   }
 }

@@ -14,16 +14,16 @@ import type {
   WorkspaceCreateValue,
   WorkspaceDeleteRequest,
   WorkspaceDeleteValue,
-  WorkspaceFavoriteSessionRequest,
-  WorkspaceFavoriteValue,
   WorkspaceFollowFrame,
   WorkspaceId,
   WorkspaceInsertBeforeRequest,
   WorkspaceInsertSessionBeforeRequest,
   WorkspaceOrderValue,
+  WorkspacePinSessionRequest,
+  WorkspacePinValue,
   WorkspaceRenameRequest,
   WorkspaceUnarchiveSessionRequest,
-  WorkspaceUnfavoriteSessionRequest,
+  WorkspaceUnpinSessionRequest,
   WorkspaceValue,
   WorkspaceView,
 } from '../../src/types.ts'
@@ -62,12 +62,15 @@ export function workspace(id: string, overrides: Partial<WorkspaceView> = {}): W
 }
 
 /**
- * A baseline frame holding the named Workspaces and no archived Sessions.
+ * A baseline frame holding the named Workspaces and no archived or pinned Sessions.
  * @param ids - Workspace ids in registry order.
  * @returns the frame.
  */
 export function baseline(...ids: readonly string[]): WorkspaceBaselineFrame {
-  return { type: 'baseline', value: { items: ids.map(id => workspace(id)), archivedSessionIds: [], favoriteSessionIds: [] } }
+  return {
+    type: 'baseline',
+    value: { items: ids.map(id => workspace(id)), archivedSessionIds: [], pinnedSessionIds: [] },
+  }
 }
 
 /**
@@ -88,6 +91,7 @@ export function followGenerations(generations: readonly StreamScript[]): StreamS
 /** Default answers: every command accepted and echoed back as the row or set it names. */
 export const workspaceWorld: RemoteTable = {
   unary: {
+    'workspace/initializeDefault': (): RemoteResult<WorkspaceValue> => ok({ workspace: workspace('default') }),
     'workspace/create': (request: WorkspaceCreateRequest): RemoteResult<WorkspaceCreateValue> => ok({
       workspace: workspace('created', { path: request.path }), created: true,
     }),
@@ -101,7 +105,7 @@ export const workspaceWorld: RemoteTable = {
     }),
     'workspace/archiveSession': (request: WorkspaceArchiveSessionRequest): RemoteResult<WorkspaceArchiveValue> => ok({ archivedSessionIds: [request.sessionId] }),
     'workspace/unarchiveSession': (_request: WorkspaceUnarchiveSessionRequest): RemoteResult<WorkspaceArchiveValue> => ok({ archivedSessionIds: [] }),
-    'workspace/favoriteSession': (request: WorkspaceFavoriteSessionRequest): RemoteResult<WorkspaceFavoriteValue> => ok({ favoriteSessionIds: [request.sessionId] }),
-    'workspace/unfavoriteSession': (_request: WorkspaceUnfavoriteSessionRequest): RemoteResult<WorkspaceFavoriteValue> => ok({ favoriteSessionIds: [] }),
+    'workspace/pinSession': (request: WorkspacePinSessionRequest): RemoteResult<WorkspacePinValue> => ok({ pinnedSessionIds: [request.sessionId] }),
+    'workspace/unpinSession': (_request: WorkspaceUnpinSessionRequest): RemoteResult<WorkspacePinValue> => ok({ pinnedSessionIds: [] }),
   },
 }

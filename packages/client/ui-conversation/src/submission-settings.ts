@@ -54,9 +54,12 @@ export interface ConversationSettings {
 }
 
 /** Durable conversation schema; also the wire envelope the browser scope validates against. */
-export const ConversationSettingsSchema: z<ConversationSettings> = z.object({
+export const ConversationSettingsFields = {
   [BUSY_ENTER_FIELD]: z.union([...BUSY_ENTER_BEHAVIORS]).default(DEFAULT_BUSY_ENTER_BEHAVIOR),
   [COMPLETION_SOUND_FIELD]: z.boolean().default(DEFAULT_COMPLETION_SOUND),
   [COMPLETION_SOUND_TONE_FIELD]: z.union([...COMPLETION_SOUND_TONES]).default(DEFAULT_COMPLETION_SOUND_TONE),
   [COMPLETION_SOUND_VOLUME_FIELD]: z.number().step(1).min(0).max(100).default(DEFAULT_COMPLETION_SOUND_VOLUME),
-})
+}
+
+/** Schema for shared configuration values. */
+export const ConversationSettingsSchema = z.object(ConversationSettingsFields)
