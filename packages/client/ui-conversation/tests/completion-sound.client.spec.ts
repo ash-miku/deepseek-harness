@@ -9,7 +9,7 @@ import {
   DEFAULT_COMPLETION_SOUND_TONE, DEFAULT_COMPLETION_SOUND_VOLUME,
   type CompletionSoundTone, type ConversationSettings,
 } from '../src/submission-settings.ts'
-import { stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { stubConfigForm } from '@deepseek-ai/dsh-client-test-runtime'
 
 const originalAudioContext = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext')
 
@@ -186,7 +186,7 @@ describe('CompletionSoundController', () => {
 
 describe('CompletionSoundPreference', () => {
   it('adopts Host state and persists tone, volume, and enabled changes', () => {
-    const host = stubSettingsScope<ConversationSettings>()
+    const host = stubConfigForm<ConversationSettings>()
     const preference = new CompletionSoundPreference(host.scope)
     host.publish({
       status: 'ready',

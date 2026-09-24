@@ -174,10 +174,9 @@ describe('ui-plan browser apply', () => {
     expect(entry.component).toBe(PlanChip)
     const injected = (entry.inject as unknown as (id: SessionId) => PlanChipInjected)(SID)
 
-    await expect(injected.setPlanMode(false)).resolves.toBeNull()
+    await expect(injected.exitPlanMode()).resolves.toBeNull()
     expect(b.execute).toHaveBeenLastCalledWith(SID, '/plan off', [])
 
-    await expect(injected.setPlanMode(true)).resolves.toBeNull()
     expect(b.execute).toHaveBeenLastCalledWith(SID, '/plan', [])
 
     // Business failure folds to the composer-visible line: the generated method
@@ -186,11 +185,10 @@ describe('ui-plan browser apply', () => {
       ok: false,
       error: new RemoteError('session/not-found', 'gone', { sessionId: SID }),
     } as never)
-    await expect(injected.setPlanMode(false)).resolves.toBe('gone (session/not-found)')
+    await expect(injected.exitPlanMode()).resolves.toBe('gone (session/not-found)')
 
     // Unmatched admission (plan-mode not composed host-side) is also a failure line.
     b.execute.mockResolvedValueOnce({ ok: true, value: undefined } as never)
-    await expect(injected.setPlanMode(true)).resolves.toBe('unknown command: /plan')
 
     expect(b.events.entries().map(entry => entry.kind)).toEqual(['submitted-plan'])
     await fiber.dispose()

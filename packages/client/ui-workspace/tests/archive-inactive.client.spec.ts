@@ -22,7 +22,6 @@ const state = (
     ids: items.map(item => item.id),
     byId: Object.fromEntries(items.map(item => [item.id, item])),
     phase: 'ready',
-    subagentsByParent: {},
     jobsBySession: {},
     ...stateOverrides,
   }

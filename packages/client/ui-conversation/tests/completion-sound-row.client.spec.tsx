@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { bindSnapshotSelector, makeTranslate, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { bindSnapshotSelector, makeTranslate, stubConfigForm } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
@@ -26,13 +26,12 @@ afterEach(() => {
 function emptySessions() {
   return bindSnapshotSelector(createSnapshotStore<SessionListState>({
     ids: [], byId: {}, phase: 'ready',
-    subagentsByParent: {}, jobsBySession: {},
   }))
 }
 
 function emptyWorkspaces() {
   return bindSnapshotSelector(createSnapshotStore<WorkspaceSnapshot>({
-    items: [], archivedSessionIds: [], favoriteSessionIds: [], state: 'idle', phase: 'ready', error: null,
+    items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
   }))
 }
 
@@ -113,7 +112,7 @@ describe('CompletionSoundVolumeRow', () => {
 
 describe('CompletionSoundPreference settings compatibility', () => {
   it('adopts a complete durable settings section', () => {
-    const host = stubSettingsScope<ConversationSettings>()
+    const host = stubConfigForm<ConversationSettings>()
     host.publish({
       status: 'ready',
       value: {
