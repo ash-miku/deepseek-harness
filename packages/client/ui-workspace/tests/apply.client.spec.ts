@@ -507,7 +507,7 @@ describe('ui-workspace apply', () => {
     const browser = faceOf(b.slots.entries('sidebar.workspaces')[0]!) as WorkspaceBrowserInjected
     browser.requestSessionRename('session' as never, 'Row title')
     expect(dialog.hooks.renameRequest.getSnapshot()).toEqual({ sessionId: 'session', currentTitle: 'Row title' })
-    for (const verb of ['forkSession', 'archiveSession', 'pinSession', 'unpinSession', 'renameSession', 'undoArchive', 'showArchived']) {
+    for (const verb of ['forkSession', 'pinSession', 'unpinSession', 'renameSession', 'undoArchive', 'showArchived']) {
       expect(browser).not.toHaveProperty(verb)
     }
     await browser.unarchiveSession('session' as never)

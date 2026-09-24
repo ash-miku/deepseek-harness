@@ -293,6 +293,10 @@ describe('Conversation inject API', () => {
     expect(activate).toHaveBeenLastCalledWith('trajectory')
     expect(header.instance.store.getSnapshot().view).toBe('trajectory')
     expect(body.instance.store.getSnapshot().view).toBe('trajectory')
+    // Restore the precondition of the upstream flow below: the dock selection is
+    // committed, so re-select the remaining View before the removal assertions.
+    header.injected.selectView('chat')
+    expect(header.instance.store.getSnapshot().view).toBe('chat')
 
     removeTrajectory()
     await b.runtime.flush()

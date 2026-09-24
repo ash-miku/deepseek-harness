@@ -587,3 +587,51 @@
     transition: none;
   }
 }
+
+.archiveField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}
+.archiveSelector {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 22px;
+  outline: none;
+  /* This compact elevated selector owns its surface level; the scrolling list
+     inherits the sidebar's quiet/revealed scrollbar state instead. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+  background: var(--dsw-alias-bg-module-platform);
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+.archiveSelector:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+.archiveSelector:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: default;
+}
+.archiveChevron {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+}
+.archiveSummary {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+}

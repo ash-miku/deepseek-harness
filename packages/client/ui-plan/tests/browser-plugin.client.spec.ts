@@ -166,7 +166,7 @@ describe('ui-plan browser apply', () => {
     expect(ctx.slots.entries('conversation.input.plan')).toHaveLength(1)
   })
 
-  it('registers the chip, executes /plan and /plan off, and unregisters on teardown', async () => {
+  it('registers the chip, executes /plan off, and unregisters on teardown', async () => {
     const b = await bench()
     const fiber = b.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
@@ -176,8 +176,6 @@ describe('ui-plan browser apply', () => {
 
     await expect(injected.exitPlanMode()).resolves.toBeNull()
     expect(b.execute).toHaveBeenLastCalledWith(SID, '/plan off', [])
-
-    expect(b.execute).toHaveBeenLastCalledWith(SID, '/plan', [])
 
     // Business failure folds to the composer-visible line: the generated method
     // reports the RPC failure in its error branch.

@@ -1720,7 +1720,8 @@ describe('API key field', () => {
   it('writes per-model thinking levels when creating a hand-declared provider', async () => {
     const { mutate } = await mountSection()
 
-    fireEvent.click(screen.getByRole('button', { name: en.addCustom }))
+    fireEvent.click(screen.getByRole('button', { name: en.add }))
+    fireEvent.click(screen.getByRole('tab', { name: en.addCustom }))
     fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
     fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: 'https://acme.test/v1' } })
     fireEvent.click(screen.getByRole('button', { name: en.addModel }))
