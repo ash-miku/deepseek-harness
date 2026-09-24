@@ -2,9 +2,11 @@
 import type {} from '@deepseek-ai/dsh-settings'
 
 import type { Volatile, Context } from '@deepseek-ai/cordis'
-import type { BusyEnterBehavior } from './submission-settings.ts'
+import type { BusyEnterBehavior, CompletionSoundTone } from './submission-settings.ts'
 import z from '@deepseek-ai/schemastery'
-import { BUSY_ENTER_FIELD } from './submission-settings.ts'
+import {
+  BUSY_ENTER_FIELD, COMPLETION_SOUND_FIELD, COMPLETION_SOUND_TONE_FIELD, COMPLETION_SOUND_VOLUME_FIELD,
+} from './submission-settings.ts'
 
 import { ConversationSettingsFields } from './submission-settings.ts'
 
@@ -21,11 +23,20 @@ export {
 export interface Config {
   /** Enter key behavior while a turn is running. */
   busyEnter: Volatile<BusyEnterBehavior>
+  /** Whether a browser sound plays after a completed turn. */
+  completionSound: Volatile<boolean>
+  /** Synthesized tone selected for completion notifications. */
+  completionSoundTone: Volatile<CompletionSoundTone>
+  /** Application-level completion tone volume percentage. */
+  completionSoundVolume: Volatile<number>
 }
 
 /** Live preferences projected to the browser. */
 export const Config = z.object({
   [BUSY_ENTER_FIELD]: ConversationSettingsFields[BUSY_ENTER_FIELD].volatile(),
+  [COMPLETION_SOUND_FIELD]: ConversationSettingsFields[COMPLETION_SOUND_FIELD].volatile(),
+  [COMPLETION_SOUND_TONE_FIELD]: ConversationSettingsFields[COMPLETION_SOUND_TONE_FIELD].volatile(),
+  [COMPLETION_SOUND_VOLUME_FIELD]: ConversationSettingsFields[COMPLETION_SOUND_VOLUME_FIELD].volatile(),
 })
 
 /** Host preferences are consumed through the configuration form projection.
