@@ -35,6 +35,7 @@ export const en = {
   'back': 'Back',
   'brand.localBuild': 'DSH Local Build',
   'brand.productName': 'DeepSeek Harness',
+  'workspace.defaultName': 'Default workspace',
   'unknown': 'Unknown',
   'none': 'None',
   'truncated': 'Truncated',

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-14-lan-web-preferences.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-14-lan-web-preferences.md
-2026-08-14-lan-web-preferences.md: a8d6ce970872fd7f69022d0abe0c7bdfc9f7c2a4
-2026-08-14-lan-web-preferences.zh.md: f7c3b50b8653fec05ce05150395f5bf5fef68f5a
+/agent-note-persist-web-preferences-and-open-every-api-method-to-lan-zerotier-pages:
+  en: a538eafbac60866b
+  zh: 3e6c7927ee5fa300
+/agent-note-persist-web-preferences-and-open-every-api-method-to-lan-zerotier-pages/problem:
+  en: f62cf362be46eb3e
+  zh: a4ec337f9d1594df
+/agent-note-persist-web-preferences-and-open-every-api-method-to-lan-zerotier-pages/decision:
+  en: 72206bdf4790e58c
+  zh: c74585e805bb4ba5
+/agent-note-persist-web-preferences-and-open-every-api-method-to-lan-zerotier-pages/alternatives-considered:
+  en: 2ef6c69cd6ebe83b
+  zh: ccf52aeedf17557e
+/agent-note-persist-web-preferences-and-open-every-api-method-to-lan-zerotier-pages/consequences:
+  en: d85276af491f8bee
+  zh: 40749c623ef127e7

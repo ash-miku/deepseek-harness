@@ -213,9 +213,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'bounded results, or a business/transport error.',
       },
       {
-        signature: 'fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId>',
+        signature: 'fork(opts: { sessionId: SessionId atSeq?: number increaseTitle?: boolean onCreated?: (childId: SessionId) => void }): Promise<SessionId>',
         description: 'Fork a session from an exact inclusive prefix of the source; on resolution the child is catalogued and can be explicitly retained.',
-        parameters: [{ name: 'opts', description: 'source session id, the optional exact inclusive boundary seq (a real event seq the caller already knows; a cut inside an open turn is balanced Host-side with synthetic closers, and omission selects the latest completed-turn prefix), and whether to increment an inherited durable title before resolving.' }],
+        parameters: [{ name: 'opts', description: 'source session id, the optional exact inclusive boundary seq (a real event seq the caller already knows; a cut inside an open turn is balanced Host-side with synthetic closers, and omission selects the latest completed-turn prefix), and whether to increment an inherited durable title before resolving. `onCreated` observes the catalogued child before that optional rename.' }],
         returns: 'the child session id.',
         throws: ['when the fork fails, or when a requested child-title rename fails after creation.'],
       },
@@ -343,15 +343,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'openWorkspace(workspaceId: WorkspaceId, beforeOpen?: (sessionId: SessionId) => void): Promise<void>',
         description: 'Connect a Workspace and open its Session unless a later navigation supersedes it.',
-        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'beforeOpen', description: 'optional synchronous preparation for the selected Session, skipped after supersession.' }],
+        parameters: [{ name: 'workspaceId', description: 'target Workspace.' }, { name: 'beforeOpen', description: 'optional synchronous preparation for the selected Session, skipped after supersession; a throw aborts the open and releases the retained reference.' }],
         returns: 'completion; a superseded request may create a Session but does not open it.',
         throws: ['on failure; a refused creation is also shown through the Workspace notice unless a later navigation or disposal superseded the request.'],
       },
       {
-        signature: 'forkSession(sessionId: SessionId): Promise<void>',
+        signature: 'forkSession(sessionId: SessionId, onCreated?: (childId: SessionId) => void): Promise<SessionId>',
         description: 'Fork a Session without changing the current selection.',
-        parameters: [{ name: 'sessionId', description: 'source Session.' }],
-        returns: 'completion after child creation and inherited-title increment.',
+        parameters: [{ name: 'sessionId', description: 'source Session.' }, { name: 'onCreated', description: 'observer before the optional child-title update.' }],
+        returns: 'the child SessionId after creation and inherited-title increment.',
       },
       {
         signature: 'connectWorkspace(workspaceId: WorkspaceId): Promise<SessionId>',
@@ -1004,12 +1004,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ThemeDefinition {\n    id: string;\n    colorScheme: \'light\' | \'dark\';\n    tokens: ThemeTokens;\n}',
   },
   {
+    name: 'ThemeFontWeight',
+    declaration: 'export type ThemeFontWeight = typeof FONT_WEIGHTS[number];',
+  },
+  {
     name: 'ThemePreference',
     declaration: 'export type ThemePreference = typeof THEME_PREFERENCES[number];',
   },
   {
     name: 'ThemeSnapshot',
-    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    fontSize: number;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n}',
+    declaration: 'export interface ThemeSnapshot {\n    preference: ThemePreference;\n    fontSize: number;\n    fontWeight: ThemeFontWeight;\n    active: ThemeDefinition;\n    themes: readonly ThemeDefinition[];\n    revision: number;\n}',
   },
   {
     name: 'ThemeTokenModes',

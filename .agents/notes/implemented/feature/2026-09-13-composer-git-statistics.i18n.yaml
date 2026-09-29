@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-13-composer-git-statistics.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-13-composer-git-statistics.md
-2026-09-13-composer-git-statistics.md: 39425ce72bf8f0311bfc4dfb6fb1d25235534d98
-2026-09-13-composer-git-statistics.zh.md: 2656563ef518feea949f04b71c416af8c3f77bc4
+/agent-note-composer-git-statistics:
+  en: 64657f4ad32cdf08
+  zh: c70c5791f362d4cc
+/agent-note-composer-git-statistics/problem:
+  en: e571ea22366af4ec
+  zh: 5cd2c86168b8acfb
+/agent-note-composer-git-statistics/decision:
+  en: 3246af62233d22e7
+  zh: 6dc4e678c5179bac
+/agent-note-composer-git-statistics/alternatives-considered:
+  en: 6acde619c6423796
+  zh: 1b1c93754c6c9550
+/agent-note-composer-git-statistics/consequences:
+  en: 3df1512e74cd8cc7
+  zh: d41fee487928a892

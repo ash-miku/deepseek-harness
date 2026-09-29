@@ -154,16 +154,13 @@ body[data-ds-dark-theme] {
 }
 
 body {
-  /* Reading canvas: a near-white #F9F9F9 ground replaces pure white, so the
-     workspace no longer sits at the top of the luminance range. The raised
-     rungs stay white and read as lifted against it; most of the contrast
-     relief comes from the lifted label rung below. */
-  --dsw-alias-bg-base: #ffffff;
-  --dsw-alias-bg-document-preview: var(--dsw-static-neutral-bluish-750);
-  --dsw-alias-label-document-preview: var(--dsw-static-neutral-bluish-200);
-  --dsw-alias-bg-layer-1: rgb(255, 255, 255);
-  --dsw-alias-bg-layer-2: rgb(255, 255, 255);
-  --dsw-alias-bg-layer-3: rgb(255, 255, 255);
+  --dsw-alias-bg-base: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-bg-document-preview: var(--dsw-static-neutral-bluish-100);
+  --dsw-alias-bg-document-selection: color-mix(in srgb, var(--dsw-static-blue-500) 40%, transparent);
+  --dsw-alias-label-document-preview: var(--dsw-static-neutral-bluish-700);
+  --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-00);
+  --dsw-alias-bg-layer-3: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-bg-mask-1: rgba(0, 0, 0, 0.24);
   --dsw-alias-bg-mask-2: rgba(0, 0, 0, 0.12);
   --dsw-alias-bg-mask-3: rgba(0, 0, 0, 0.48);
@@ -205,6 +202,8 @@ body {
   --dsw-alias-interactive-bg-hover-solid: var(--dsw-static-neutral-bluish-75);
   --dsw-alias-interactive-bg-hover: rgba(38, 49, 72, 0.06);
   --dsw-alias-label-caption: #aab0b5;
+  --dsw-alias-label-deep-diving: color-mix(in srgb, var(--dsw-static-deepseek-500) 70%, var(--dsw-static-blue-950));
+  --dsw-alias-label-deep-diving-shimmer: color-mix(in srgb, var(--dsw-static-deepseek-500) 30%, var(--dsw-static-blue-950));
   --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-200);
   --dsw-alias-label-primary-bluish: var(--dsw-static-blue-900);
   --dsw-alias-label-primary-dimmed: var(--dsw-static-neutral-bluish-950);
@@ -212,7 +211,9 @@ body {
   --dsw-alias-label-primary-inverted: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-label-primary: #1a1c1f;
   --dsw-alias-label-secondary: #85898d;
+  --dsw-alias-label-shimmer: color-mix(in srgb, var(--dsw-static-neutral-1000) 30%, transparent);
   --dsw-alias-label-tertiary: #9aa0a6;
+  --dsw-alias-menu-icon: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-link: #3a83f7;
   --dsw-alias-markdown-citation: #eef4f9;
   --dsw-alias-markdown-code-block-banner: #e9eaea;
@@ -238,13 +239,17 @@ body {
   --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-100);
+  --dsw-alias-switch-thumb: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-toast-bg: var(--dsw-static-neutral-bluish-800);
+  --dsw-alias-toast-label: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-850);
+  --dsw-alias-tooltip-key-bg: color-mix(in srgb, var(--dsw-alias-tooltip-bg), white 18%);
   --dsw-specific-bubble-highlight: #d2e6fc;
   --dsw-specific-bubble: #e8f3fe;
   --dsw-specific-input-major: var(--dsw-static-neutral-bluish-00);
   --dsw-specific-login-input: var(--dsw-static-neutral-bluish-50);
-  --dsw-specific-menu: var(--dsw-alias-bg-layer-3);
+  --dsw-menu-surface-fill: rgba(248, 249, 250, 0.58);
+  --dsw-specific-menu: var(--dsw-menu-surface-fill);
   --dsw-specific-selector: #eef4f9;
   --dsw-specific-sidebar-fill: #eef4f9;
   --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-deepseek-100);
@@ -260,6 +265,7 @@ body[data-ds-dark-theme] {
      floor and the top label dims, so white text no longer blooms at ~17.6:1. */
   --dsw-alias-bg-base: rgb(29, 30, 33);
   --dsw-alias-bg-document-preview: var(--dsw-static-neutral-bluish-950);
+  --dsw-alias-bg-document-selection: color-mix(in srgb, var(--dsw-static-blue-500) 40%, transparent);
   --dsw-alias-label-document-preview: var(--dsw-static-neutral-bluish-300);
   --dsw-alias-bg-layer-1: var(--dsw-static-neutral-bluish-875);
   --dsw-alias-bg-layer-2: var(--dsw-static-neutral-bluish-850);
@@ -305,6 +311,8 @@ body[data-ds-dark-theme] {
   --dsw-alias-interactive-bg-hover-solid: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-interactive-bg-hover: rgba(255, 255, 255, 0.08);
   --dsw-alias-label-caption: rgb(132, 137, 144);
+  --dsw-alias-label-deep-diving: color-mix(in srgb, var(--dsw-static-deepseek-450) 55%, var(--dsw-static-neutral-bluish-400));
+  --dsw-alias-label-deep-diving-shimmer: color-mix(in srgb, var(--dsw-static-blue-300) 65%, var(--dsw-static-deepseek-400));
   --dsw-alias-label-dimmed: var(--dsw-static-neutral-bluish-750);
   --dsw-alias-label-primary-bluish: var(--dsw-static-neutral-bluish-50);
   --dsw-alias-label-primary-dimmed: var(--dsw-static-neutral-bluish-100);
@@ -312,7 +320,9 @@ body[data-ds-dark-theme] {
   --dsw-alias-label-primary-inverted: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-label-primary: rgb(214, 217, 222);
   --dsw-alias-label-secondary: rgb(168, 173, 181);
+  --dsw-alias-label-shimmer: color-mix(in srgb, var(--dsw-static-neutral-00) 45%, transparent);
   --dsw-alias-label-tertiary: rgb(146, 151, 159);
+  --dsw-alias-menu-icon: var(--dsw-alias-label-primary-dimmed);
   --dsw-alias-link: var(--dsw-static-deepseek-400);
   --dsw-alias-markdown-citation: var(--dsw-static-neutral-bluish-800);
   --dsw-alias-markdown-code-block-banner: var(--dsw-static-neutral-bluish-850);
@@ -337,13 +347,17 @@ body[data-ds-dark-theme] {
   --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-900);
+  --dsw-alias-switch-thumb: var(--dsw-static-neutral-bluish-400);
   --dsw-alias-toast-bg: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-toast-label: var(--dsw-static-neutral-bluish-00);
   --dsw-alias-tooltip-bg: var(--dsw-static-neutral-bluish-750);
+  --dsw-alias-tooltip-key-bg: color-mix(in srgb, var(--dsw-alias-tooltip-bg), white 18%);
   --dsw-specific-bubble-highlight: var(--dsw-static-neutral-bluish-750);
   --dsw-specific-bubble: var(--dsw-static-neutral-bluish-850);
   --dsw-specific-input-major: var(--dsw-static-neutral-bluish-850);
   --dsw-specific-login-input: var(--dsw-static-neutral-bluish-900);
-  --dsw-specific-menu: var(--dsw-alias-bg-layer-3);
+  --dsw-menu-surface-fill: rgba(67, 69, 74, 0.45);
+  --dsw-specific-menu: var(--dsw-menu-surface-fill);
   --dsw-specific-selector: var(--dsw-static-neutral-bluish-800);
   --dsw-specific-sidebar-fill: var(--dsw-static-neutral-bluish-900);
   --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-neutral-bluish-800);
@@ -415,4 +429,14 @@ body[data-ds-dark-theme] {
   --dsw-specific-bubble: #173e76;
   --dsw-specific-bubble-highlight: #1f4d8f;
   --dsw-specific-sidebar-fill: #1b2126;
+}
+
+/* Overlays without MenuSurface's opaque backing cannot blur page content over
+ * native vibrancy reliably, so their fill stays nearly opaque on macOS. */
+html[data-platform='darwin'] body {
+  --dsw-specific-menu: rgba(248, 249, 250, 0.94);
+}
+
+html[data-platform='darwin'] body[data-ds-dark-theme] {
+  --dsw-specific-menu: rgba(48, 49, 54, 0.94);
 }

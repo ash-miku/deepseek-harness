@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-git-changes-response-cap.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-14-git-changes-response-cap.md
-2026-09-14-git-changes-response-cap.md: d4615eddfa0d93aca3ebca8880c1830ded620cc5
-2026-09-14-git-changes-response-cap.zh.md: 75f213968e8b941c5d1d1b1bed4cca90ffc7d001
+/agent-note-cap-the-git-changes-status-response:
+  en: 25043efc2044bc1d
+  zh: 79077ccc5b61b6e8
+/agent-note-cap-the-git-changes-status-response/problem:
+  en: d6ddcdc0403461f9
+  zh: 3ccc71eccc3b4b91
+/agent-note-cap-the-git-changes-status-response/decision:
+  en: 08fbb13574a475cd
+  zh: b111852ce56c2e50
+/agent-note-cap-the-git-changes-status-response/alternatives-considered:
+  en: 147c0fc4eecf2c77
+  zh: 742ec0501a4b462f
+/agent-note-cap-the-git-changes-status-response/consequences:
+  en: cc7dc33d9ade7e96
+  zh: 7a6a134310b7686d

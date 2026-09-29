@@ -1,2 +1,19 @@
-2026-08-19-chat-fold-interjection-order.md: 6bf477fb2f3bf5e50a37bb6895da1c1e6f867122
-2026-08-19-chat-fold-interjection-order.zh.md: 163604c9830ee3b355ca0115cb4a1118ec3ec2eb
+# Bilingual-pair consistency record for 2026-08-19-chat-fold-interjection-order.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-19-chat-fold-interjection-order.md
+/agent-note-preserve-interjection-order-in-folded-chat:
+  en: 33f9b2d6baacc17d
+  zh: 7cfa2860c4ac5bda
+/agent-note-preserve-interjection-order-in-folded-chat/problem:
+  en: 53d71742eb83ddac
+  zh: 59988dee83f345ea
+/agent-note-preserve-interjection-order-in-folded-chat/decision:
+  en: 4994681b2443f632
+  zh: 8c25d85ebfee19c4
+/agent-note-preserve-interjection-order-in-folded-chat/alternatives-considered:
+  en: a6845c1c30829c22
+  zh: 68995bfc261b1c0a
+/agent-note-preserve-interjection-order-in-folded-chat/consequences:
+  en: 0a36ac7ce1b90e26
+  zh: 53cf470113c024e6

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-15-bulk-archive-inactive-sessions.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-bulk-archive-inactive-sessions.md
-2026-08-15-bulk-archive-inactive-sessions.md: db1f0c21ef15a34cee4ec362e4e741ab80ab829b
-2026-08-15-bulk-archive-inactive-sessions.zh.md: b2739af3ebd2a6bc16ac8b66b3650774ff28321f
+/agent-note-bulk-archive-inactive-sessions:
+  en: 21f000435d5d05c5
+  zh: cad567166b2a9c54
+/agent-note-bulk-archive-inactive-sessions/problem:
+  en: be2ca6653646a964
+  zh: a924b7c976d442a8
+/agent-note-bulk-archive-inactive-sessions/decision:
+  en: 46edfc485f4fd7bf
+  zh: 5a2f4f83b196bbeb
+/agent-note-bulk-archive-inactive-sessions/alternatives-considered:
+  en: 3f2ea1da2ce95b8b
+  zh: 0a84a9387a0a608c
+/agent-note-bulk-archive-inactive-sessions/consequences:
+  en: ef3ab183da78c24a
+  zh: da84e598a4342153
+/agent-note-bulk-archive-inactive-sessions/testing:
+  en: 230083442f850cbf
+  zh: c522fab58d0f5fb4

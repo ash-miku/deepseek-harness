@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-web-completion-sound.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-web-completion-sound.md
-2026-08-23-web-completion-sound.md: 17eb1c4f47a07c7f36e409ebfaf995e6fd891754
-2026-08-23-web-completion-sound.zh.md: 261c7f55731dcbb48bd35872638a2a37fe48afcc
+/agent-note-web-task-completion-sound-notifications:
+  en: 661bc4b9d4057859
+  zh: 706eb37607ab512d
+/agent-note-web-task-completion-sound-notifications/problem:
+  en: 3141e2f7492928c0
+  zh: 8b82847f2a4fa4a7
+/agent-note-web-task-completion-sound-notifications/decision:
+  en: 366cbb307c099f0d
+  zh: f288327ab0d4cfc0
+/agent-note-web-task-completion-sound-notifications/alternatives-considered:
+  en: 491b0e15c4b1e755
+  zh: 36015b8bdcaebc18
+/agent-note-web-task-completion-sound-notifications/consequences:
+  en: fa8c0e7794c2427c
+  zh: 3da1818af09bceab

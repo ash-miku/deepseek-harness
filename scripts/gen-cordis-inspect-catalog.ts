@@ -21,7 +21,7 @@ const CLIENT_SERVICES: Readonly<Record<string, readonly string[]>> = {
   ],
   workspaces: [
     'create', 'rename', 'delete', 'insertSessionBefore', 'archiveSession',
-    'unarchiveSession', 'favoriteSession', 'unfavoriteSession',
+    'unarchiveSession',
   ],
 }
 

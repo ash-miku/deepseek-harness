@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-20-web-baseline-startup-retry.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-20-web-baseline-startup-retry.md
-2026-08-20-web-baseline-startup-retry.md: 9872930d3048341839811499c5f8c1b9e7613685
-2026-08-20-web-baseline-startup-retry.zh.md: 241844c2fe82aa09514db8a9409e00fd3de85d1a
+/agent-note-retry-web-session-and-workspace-baselines-after-transient-startup-failures:
+  en: 286356dc73683276
+  zh: b6ee9ba0d704b3e1
+/agent-note-retry-web-session-and-workspace-baselines-after-transient-startup-failures/problem:
+  en: 1fb14fdf925933de
+  zh: 5237acdd157e553c
+/agent-note-retry-web-session-and-workspace-baselines-after-transient-startup-failures/decision:
+  en: 773db35e943b86f4
+  zh: f132d2e11e84e0cc
+/agent-note-retry-web-session-and-workspace-baselines-after-transient-startup-failures/alternatives-considered:
+  en: f5431c499875a952
+  zh: 80a33553833648fb
+/agent-note-retry-web-session-and-workspace-baselines-after-transient-startup-failures/consequences:
+  en: cedd07bbf5190bcc
+  zh: a58f2f34c845a5cb
+/agent-note-retry-web-session-and-workspace-baselines-after-transient-startup-failures/testing:
+  en: 02f64a636bb13e90
+  zh: bbca465db6c55579
