@@ -8,8 +8,9 @@
 # The web-startup plugin injects `cmdlineArgs` and provides `webStartup` as an
 # ordinary Cordis service. Rows configured from flags inject that service, so
 # Loader resolves their expressions only after it exists. The web-runtime row
-# validates the advertised public URL; Connection reads invocation authorities
-# directly from `webStartup`.
+# validates the advertised public URL and, once the server binds, provides
+# bind-dependent `webRuntime` values; Connection reads its trust authorities
+# from `webRuntime`.
 # `dsh --profile web --help` provides no `webStartup`, so no server binds.
 
 # ── surface-specific values the base deliberately omits ─────────────────────
@@ -179,16 +180,17 @@
     # ── layer 2: transport/service ──────────────────────────────────────────────
 
     # Plain route-registration carrier; host and port come from the app's
-    # webStartup provider, with these deployment fallbacks. The dist is served
-    # by the web-runtime row below through the fallback seat. Routing and
-    # browser-facing asset paths do not depend on the advertised URL, which the
-    # web-runtime row owns; Connection reads trust authorities from webStartup.
-    # This row rejects wildcard binds.
+    # webStartup provider, with these deployment fallbacks. The default
+    # all-interfaces bind serves the browser UI to every local network (LAN and
+    # overlay alike); the dist is served by the web-runtime row below through
+    # the fallback seat. Routing and browser-facing asset paths do not depend on
+    # the advertised URL, which the web-runtime row owns; Connection reads trust
+    # authorities from webRuntime.
     - id: webserver
       name: '@deepseek-ai/dsh-host-webserver'
       inject: [webStartup]
       config:
-        host: !!js ctx.webStartup.host ?? '127.0.0.1'
+        host: !!js ctx.webStartup.host ?? '0.0.0.0'
         port: !!js ctx.webStartup.port ?? 3080
         tls: !!js ctx.webStartup.tls
         compression: gzip
@@ -202,9 +204,11 @@
     # canonical URL after the full Loader tree settles and the required-
     # entry audit passes. Invocation-only values come from the webStartup
     # provider; the advertised application URL is this row's `publicUrl`,
-    # otherwise the bind-address URL. A complete agent-preset persona
-    # suppresses the prompt section for that agent while retaining the
-    # host-owned shell variable.
+    # otherwise the bind-address URL, and an all-interfaces bind additionally
+    # publishes one tokenized URL per LAN address. It also provides the
+    # bind-dependent `webRuntime` trust snapshot the connection row injects.
+    # A complete agent-preset persona suppresses the prompt section for that
+    # agent while retaining the host-owned shell variable.
     - id: web-runtime
       name: '@deepseek-ai/dsh-web-app'
       inject: [webStartup]
@@ -213,6 +217,7 @@
         printUrl: true
         publicUrl: !!js ctx.webStartup.publicUrl
         surfaceContext: true
+        trustedHosts: !!js ctx.webStartup.trustedHosts
 
     # The client-plugin reload chain, always mounted: it is idle until a
     # rebuild watcher (pnpm run dev:web) actually rewrites client bundles. It
@@ -236,12 +241,13 @@
     # policy; an advertised public URL contributes nothing to it.
     - id: connection
       name: '@deepseek-ai/dsh-client-connection'
-      inject: [webStartup]
+      inject: [webRuntime]
       config:
-        # Keep invocation authorities (each --trusted-host value) when adding
-        # deployment values, for example: ['app.internal', ...ctx.webStartup.trustedHosts].
+        # The bind-dependent snapshot already folds in every invocation
+        # `--trusted-host` value, so a deployment that adds its own authorities
+        # appends them here, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
         # The listener's bind IP is accepted separately from this list.
-        trustedHosts: !!js ctx.webStartup.trustedHosts
+        trustedHosts: !!js ctx.webRuntime.trustedHosts
 
     # Raw Blob and ReadableStream uploads run independently of Connection's
     # RPC and generation service.

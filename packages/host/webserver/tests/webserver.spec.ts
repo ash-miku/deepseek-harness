@@ -225,7 +225,7 @@ describe('real Loader composition', () => {
     }
   })
 
-  it('rejects every wildcard spelling by address value, not by text', () => {
+  it('accepts every wildcard spelling so one listener can serve several local networks', () => {
     // Every spelling node:net accepts that parses to the unspecified address:
     // IPv4 any, IPv6 any in long and short forms, IPv4-compatible, and the
     // IPv4-mapped forms of IPv4 any, with or without a zone.
@@ -234,9 +234,7 @@ describe('real Loader composition', () => {
       '::ffff:0.0.0.0', '::ffff:0:0', '::ffff:0000:0000', '0:0:0:0:0:ffff:0:0',
       '0:0:0:0:0:ffff:0.0.0.0', '::ffff:0.0.0.0%eth0',
     ]) {
-      expect(() => HttpServer.Config({ host, port: 0 })).toThrow(
-        /is an unspecified \(wildcard\) address, which is not supported/,
-      )
+      expect(HttpServer.Config({ host, port: 0 }).host).toBe(host)
     }
     for (const host of ['localhost', 'example.com', '*', '[::]', '[fd00::1]', '10.1.2.3/8']) {
       expect(() => HttpServer.Config({ host, port: 0 }))
@@ -244,13 +242,11 @@ describe('real Loader composition', () => {
     }
   })
 
-  it('denies the IPv4-mapped wildcard through the real plugin load, not only the predicate', async () => {
-    // The Loader is nontransactional: a rejected config leaves a FAILED fiber
-    // whose await carries the schema error rather than rejecting loader.await().
-    const denied = await loadComposition(0, false, '::ffff:0.0.0.0')
-    const fiber = webserverFiber(denied)
-    expect(fiber?.state).toBe(FiberState.FAILED)
-    await expect(fiber?.await()).rejects.toThrow(/is an unspecified \(wildcard\) address/)
+  it('activates the IPv4-mapped wildcard through the real plugin load, not only the predicate', async () => {
+    const accepted = await loadComposition(0, false, '::ffff:0.0.0.0')
+    const fiber = webserverFiber(accepted)
+    await fiber?.await()
+    expect(accepted.get('webServer')?.host).toBe('::ffff:0.0.0.0')
   })
 
   it('classifies loopback bind addresses from the parsed value, including mapped and zone forms', () => {

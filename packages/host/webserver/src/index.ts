@@ -263,9 +263,9 @@ export class WebServer extends Service {
     host: z.transform(z.string(), (value) => {
       const parsed = parseIpLiteral(value)
       if (parsed === undefined) throw notLiteralError(value)
-      if (isWildcardAddress(parsed)) {
-        throw new Error(`webserver: host ${JSON.stringify(value)} is an unspecified (wildcard) address, which is not supported: binding every interface would expose remote code execution to the network; bind one concrete IPv4 or IPv6 address of a local interface instead`)
-      }
+      // A wildcard bind is accepted so one listener can serve several local
+      // networks; the /api Host/Origin fence still admits only the authorities
+      // this deployment declares, so the port is not open to arbitrary hosts.
       return value
     }).required(),
     port: z.natural().max(65535).required(),

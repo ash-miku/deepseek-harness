@@ -60,7 +60,7 @@ export const apply = ctx => globalThis.__webStartupApply(ctx)
     `  name: ${pathToFileURL(join(dir, 'reader.mjs')).href}`,
     `  inject: [${WEB_STARTUP_SERVICE}]`,
     '  config:',
-    "    host: !!js ctx.webStartup.host ?? '127.0.0.1'",
+    "    host: !!js ctx.webStartup.host ?? '0.0.0.0'",
     '    openBrowser: !!js ctx.webStartup.openBrowser',
     '    port: !!js ctx.webStartup.port ?? 3080',
     '    publicUrl: !!js ctx.webStartup.publicUrl',
@@ -115,21 +115,25 @@ describe('web command-line provider', () => {
     expect(observed.exits).toEqual([])
   })
 
-  // The webserver suite owns the wildcard spellings; the CLI only has to
-  // refuse them by address value before any consumer activates.
-  it.each(['0.0.0.0', '::ffff:0.0.0.0'])('rejects wildcard --host %s before activating consumers', async (host) => {
+  // A wildcard bind serves every local network; the CLI publishes the spelling
+  // the operator gave, and value classification belongs to the webserver.
+  it.each(['0.0.0.0', '::ffff:0.0.0.0'])('accepts wildcard --host %s and publishes it', async (host) => {
     const { values, observed } = await bootProvider(['--host', host])
-    expect(observed.out).toContain(`error: --host ${host} is an unspecified (wildcard) address`)
-    expect(values).toBeUndefined()
-    expect(observed.readerConfig).toBeUndefined()
-    expect(observed.exits).toEqual([1])
+    expect(values).toEqual({ host, openBrowser: true, trustedHosts: [] })
+    expect(observed.readerConfig).toEqual({
+      host,
+      openBrowser: true,
+      port: 3080,
+      trustedHosts: [],
+    })
+    expect(observed.exits).toEqual([])
   })
 
   it('leaves deployment values to each consumer when flags omit them', async () => {
     const { values, observed } = await bootProvider([])
     expect(values).toEqual({ openBrowser: true, trustedHosts: [] })
     expect(observed.readerConfig).toEqual({
-      host: '127.0.0.1',
+      host: '0.0.0.0',
       openBrowser: true,
       port: 3080,
       trustedHosts: [],
@@ -166,7 +170,7 @@ describe('web command-line provider', () => {
       trustedHosts: ['lab.internal'],
     })
     expect(observed.readerConfig).toEqual({
-      host: '127.0.0.1',
+      host: '0.0.0.0',
       openBrowser: true,
       port: 3080,
       publicUrl: 'https://web.example/ui',

@@ -6,7 +6,8 @@
  * config), mounts the `frontend-static` fallback owner over it, registers the
  * harness-source and web-surface prompt sections, the bash-visible web runtime
  * variable, the process-token URL line, and the default-browser handoff. An
- * advertised `publicUrl` replaces the published bind-address URL. Non-loopback
+ * advertised `publicUrl` replaces the published bind-address URL, and a bind
+ * on every interface also publishes one tokenized URL per LAN address. Non-loopback
  * HTTP binds trigger an exposure warning. App command-line values arrive
  * through the `webStartup` service expressions in the bundle patch.
  * @module @deepseek-ai/dsh-web-app
@@ -15,6 +16,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { isIP } from 'node:net'
+import { networkInterfaces } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
@@ -22,7 +24,7 @@ import z from '@deepseek-ai/schemastery'
 import { addHarnessSourceSection, auditStartupEntries } from '@deepseek-ai/dsh-app-boot'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import * as FrontendStatic from '@deepseek-ai/dsh-host-frontend-static'
-import { isLoopbackHost, normalizeBindAddress } from '@deepseek-ai/dsh-host-webserver'
+import { isLoopbackHost, isWildcardHost, normalizeBindAddress } from '@deepseek-ai/dsh-host-webserver'
 import { launchedThroughSsh, launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import { scrubbedParentEnv } from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
@@ -35,6 +37,12 @@ export const name = 'web-app'
 /** This dsh installation's root, from either this package's source or built entry. */
 const SOURCE_ROOT = fileURLToPath(new URL('../../../..', import.meta.url))
 const ANNOUNCED_ROOTS = new WeakSet<Context>()
+
+/** Runtime service that releases Web rows after bind-dependent values resolve. */
+const WEB_RUNTIME_SERVICE = 'webRuntime'
+
+/** The canonical local origin an all-interfaces bind is reachable at on this machine. */
+const LOOPBACK_HOST = '127.0.0.1'
 
 /** Services required before the web runtime can mount. */
 export const inject = ['webServer']
@@ -60,6 +68,8 @@ export interface Config {
    * Absent or YAML `null` advertises the bind-address URL.
    */
   publicUrl?: string
+  /** Explicit `--trusted-host` authorities from this invocation, in argument order. */
+  trustedHosts: string[]
 }
 
 export const Config: z<Config> = z.object({
@@ -67,10 +77,38 @@ export const Config: z<Config> = z.object({
   printUrl: z.boolean().default(true),
   surfaceContext: z.boolean().default(true),
   publicUrl: z.transform(z.string(), value => parsePublicUrl(value).href),
+  trustedHosts: z.array(String).default([]),
 })
+
+/** Bind-dependent Web values shared by the trust fence and URL display. */
+export interface WebRuntimeValues {
+  /** LAN IPv4 literals sampled once when the server binds all interfaces. */
+  lanAddresses: string[]
+  /** LAN literals followed by explicit invocation authorities. */
+  trustedHosts: string[]
+}
 
 /** Environment variable naming the advertised URL of this Web GUI. */
 const DSH_WEB_URL = 'DSH_WEB_URL' as const
+
+/**
+ * Resolve one LAN-trust snapshot from the active server bind.
+ *
+ * Derived entries are port-less IP literals: DNS rebinding needs an
+ * attacker-controlled name, while an IP-literal Host is safe on any port and
+ * an OS-assigned port is unknowable before bind.
+ * @param bindHost - the active webserver bind host.
+ * @param extra - explicit `--trusted-host` values, in argument order.
+ * @returns the LAN display addresses and invocation-derived fence authorities.
+ */
+export function resolveLanTrust(bindHost: string, extra: readonly string[]): WebRuntimeValues {
+  const lanAddresses = isWildcardHost(bindHost)
+    ? Object.values(networkInterfaces()).flat()
+      .filter((iface): iface is NonNullable<typeof iface> => iface !== undefined && iface.family === 'IPv4' && !iface.internal)
+      .map(iface => iface.address)
+    : []
+  return { lanAddresses, trustedHosts: [...lanAddresses, ...extra] }
+}
 
 const BROWSER_OPENER_MODULE = import.meta.resolve('open')
 
@@ -127,6 +165,9 @@ function localWebUrl(ctx: Context): string {
  * tail reads as the address it names, so `::0.0.0.1` reads as `::1` rather
  * than as `0.0.0.1`. Interface zone IDs cannot appear in a URL; only a
  * redundant loopback zone can be dropped.
+ * An all-interfaces bind has no browser-reachable URL of its own; the
+ * loopback origin is this machine's canonical local address for it, and the
+ * per-network addresses are published separately.
  * @param host - webserver bind address.
  * @returns the zone-free URL host.
  * @throws when a non-loopback zone requires an explicit public URL.
@@ -135,6 +176,7 @@ function advertisedBindHost(host: string): string {
   const zoneAt = host.indexOf('%')
   const bare = zoneAt === -1 ? host : host.slice(0, zoneAt)
   if (isLoopbackHost(bare)) return normalizeBindAddress(bare)
+  if (isWildcardHost(bare)) return LOOPBACK_HOST
   if (zoneAt === -1) return host
   throw new Error(
     `web-app: bind address ${JSON.stringify(host)} carries an interface zone id, which no URL can express;`
@@ -241,6 +283,10 @@ export function apply(ctx: Context, config: Config): void {
   if (ctx.webServer.protocol === 'http:' && !isLoopbackHost(boundHost)) {
     console.warn(`dsh web: listening on ${boundHost} over plain HTTP; restrict this port to a trusted proxy or network`)
   }
+  // Bind-dependent values the trust fence and the URL line share; the
+  // connection row injects this service, so it resolves after the bind.
+  const runtime = resolveLanTrust(boundHost, config.trustedHosts)
+  ctx.provide(WEB_RUNTIME_SERVICE, runtime)
   // The bind URL belongs to this host. Under SSH, the operator reaches it
   // through a local forwarding address that this process cannot derive.
   const handoffBrowser = config.openBrowser && !launchedThroughSsh(launchEnvironmentOf(ctx))
@@ -275,9 +321,15 @@ export function apply(ctx: Context, config: Config): void {
         if (ANNOUNCED_ROOTS.has(connectionCtx.root)) return
         const webUrl = appRootUrl(connectionCtx, publicUrl)
         const authenticatedUrl = connectionCtx.connection.authenticatedUrl(webUrl)
+        // Reuse the exact LAN snapshot provided to the /api trust fence, and
+        // carry the launch token on every address a reachable page may use.
+        const { protocol, port } = connectionCtx.webServer
+        const lanUrls = runtime.lanAddresses
+          .map(address => connectionCtx.connection.authenticatedUrl(`${protocol}//${address}:${String(port)}`))
+          .join(', ')
         ANNOUNCED_ROOTS.add(connectionCtx.root)
         if (config.printUrl) {
-          console.log(`dsh web: ${authenticatedUrl}`)
+          console.log(`dsh web: ${authenticatedUrl}${lanUrls.length === 0 ? '' : ` (LAN: ${lanUrls})`}`)
         }
         if (handoffBrowser) {
           console.log('dsh web: opening the default browser; pass --no-open to disable')
