@@ -13,7 +13,6 @@ kind: "package-reference"
 ## 目录
 
 - [功能](#what-it-does)
-- [输入区统计](#composer-statistics)
 - [扩展点](#extension-points)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
@@ -34,11 +33,6 @@ kind: "package-reference"
 Git 通过 `execFile` 调用，不经过 shell；浏览器传入的每个路径与 ref 在变成参数前都会校验。
 
 -----
-
-<a id="composer-statistics"></a>
-## 输入区统计
-
-浏览器把未提交的文件总量贡献到 `conversation.composer.dock.stats`，与会话用量并排显示。它显示本地化的改动文件文案、绿色新增与红色删除。点击统计会通过 Conversation 外壳已有的视图选择动作选中当前会话的 Changes 标签。会话变化、运行状态变化或窗口重新获得焦点时刷新计数；干净或不可用的仓库隐藏该条目。分支对比的选择不影响该页脚。文件计数包含已暂存、未暂存、未跟踪与二进制改动，列表被截断时仍为截断前的总数；行数总量使用工作区相对 HEAD 的差异（首次提交前为空树），未跟踪文本计为新增。二进制文件不贡献文本行。
 
 -----
 

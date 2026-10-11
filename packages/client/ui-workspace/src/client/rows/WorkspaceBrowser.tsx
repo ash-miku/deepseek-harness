@@ -1334,7 +1334,7 @@ export function WorkspaceBrowser({
           side="right"
           onPick={(workspaceId) => {
             closeAddWorkspace()
-            startSession(workspaceId)
+            startSession(workspaceId, { clearPreviousDraft: false })
           }}
           onClose={() => { closeAddWorkspace() }}
         />

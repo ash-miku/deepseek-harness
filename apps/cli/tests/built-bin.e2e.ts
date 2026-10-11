@@ -372,17 +372,16 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
       expect(web.stderr).toBe('')
       expect(web.stdout).toContain('Usage: dsh --profile web')
       expect(web.stdout).toContain('--port <port>')
+      expect(web.stdout).toContain('--public-url <url>')
       expect(web.stdout).not.toContain('dsh web: http://')
 
-      const wildcardHost = await runBuiltBin(['web', '--host', '0.0.0.0', '--help'], {
+      const wildcardHost = await runBuiltBin(['web', '--host', '0.0.0.0'], {
         DSH_HOME: home,
         DSH_TELEMETRY_DISABLED: '1',
       })
-      expect(wildcardHost.code).toBe(0)
-      expect(wildcardHost.stderr).toBe('')
-      expect(wildcardHost.stdout).toContain('--host <host>')
-      expect(wildcardHost.stdout).toContain('default: 0.0.0.0')
-      expect(wildcardHost.stdout).not.toContain('dsh web: http://')
+      expect(wildcardHost.code).toBe(1)
+      expect(wildcardHost.stdout).toBe('')
+      expect(wildcardHost.stderr).not.toContain('dsh web: http://')
 
       const headlessHelp = await runBuiltBin(['headless', '--help'], {
         DSH_HOME: home,
@@ -1249,6 +1248,9 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
         ['plugin-package-inventory-deepseek', '@deepseek-ai/dsh-plugin-package-inventory-deepseek'],
         ['llm-deepseek', '@deepseek-ai/dsh-llm-deepseek-api-key'],
         ['sandbox', '@deepseek-ai/dsh-sandbox-local'],
+        ['filesystem', '@deepseek-ai/dsh-fs-local'],
+        ['working-directory', '@deepseek-ai/dsh-working-directory'],
+        ['tool-working-directory', '@deepseek-ai/dsh-tool-working-directory'],
         ['session-projection', '@deepseek-ai/dsh-session-projection'],
         ['sandbox-policy', '@deepseek-ai/dsh-sandbox-policy'],
         ['subprocess', '@deepseek-ai/dsh-subprocess-local'],
@@ -1265,11 +1267,6 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
         ['agent', '@deepseek-ai/dsh-agent'],
         ['llm-retry', '@deepseek-ai/dsh-llm-retry'],
         ['jobs', '@deepseek-ai/dsh-jobs-local'],
-        ['invariants', '@deepseek-ai/dsh-invariants'],
-        ['session-invariant', '@deepseek-ai/dsh-session/invariant'],
-        ['agent-invariant', '@deepseek-ai/dsh-agent/invariant'],
-        ['scope-invariant', '@deepseek-ai/dsh-scope/invariant'],
-        ['agent-loop-invariant', '@deepseek-ai/dsh-agent-loop/invariant'],
         ['agent-loop', '@deepseek-ai/dsh-agent-loop'],
         ['persistent-bash', '@deepseek-ai/dsh-tool-bash-persistent'],
         ['persistent-pwsh', '@deepseek-ai/dsh-tool-pwsh-persistent'],

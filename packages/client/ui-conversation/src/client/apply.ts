@@ -1,5 +1,4 @@
 /** Registers the target-neutral Conversation assembly, shell, input, and docks. */
-import { ComposerDock } from './skeleton/ComposerDock.tsx'
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
@@ -376,7 +375,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, (nextId) => {
         if (sessionId !== undefined && nextId !== sessionId) {
           const from = inputHub.shell(sessionId)
-          const draft = from.snapshot.draft
+          const draft = from.draftSnapshot
           const attachmentIds = from.snapshot.attachmentIds
           const next = inputHub.shell(nextId)
           if (attachmentIds.length === 0 || next.addAttachments(attachmentIds)) {
@@ -384,7 +383,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
               throw new Error(`ui-conversation: session "${nextId}" resolved no binding`)
             }
             concreteConversation(ctx).rebindDraftFiles(nextId, attachmentIds)
-            if (draft !== '') {
+            if (draft.text !== '') {
               next.setDraft(draft)
               from.setDraft('')
             }
@@ -429,7 +428,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
             },
           },
         },
-        bindDraftMirror: write => inputHub.shell(sessionId).bindMirror(write),
+        bindDraftPersistence: write => inputHub.shell(sessionId).bindDraftPersistence(write),
         openView,
       }
     },
@@ -462,18 +461,6 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       },
     }),
   }, ConversationSessionHeader)
-
-  slots.inject('conversation.composer.dock', () => slots.register({
-    name: 'conversation.composer.dock', id: 'content', order: 0,
-    children: { 'conversation.composer.dock.content': { kind: 'list', scope: 'session' } },
-    store: conversationStore,
-    inject: (sessionId: SessionId, actions: BoundActions<typeof conversationStore>) => ({
-      selectView: (view: string) => {
-        activateView(sessionId, view)
-        actions.setView(view)
-      },
-    }),
-  }, ComposerDock))
 
   const registerComposerBar = () => slots.register({
     name: 'conversation.composer.bar',

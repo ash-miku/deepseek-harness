@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { ThemePreference, ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import type { FontFamilies, ThemeFontWeight, ThemePreference, ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import { fontFamilyVariable } from '@deepseek-ai/dsh-client-ui-theme/src/theme-settings.ts'
 import {
   CONTENT_FONT_SIZE_VARIABLE, CONTENT_FONT_WEIGHT_VARIABLE, DARK_ATTRIBUTE, THEME_SOURCE_ATTRIBUTE, ThemePresenter,
 } from '@deepseek-ai/dsh-client-ui-layout/src/client/theme-presenter.ts'
@@ -14,11 +15,14 @@ function snapshot(
   tokens: Record<string, string> = {},
   fontSize = 14,
   preference: ThemePreference = colorScheme,
-  fontWeight: 400 | 500 | 600 = 500,
+  fontWeight: ThemeFontWeight = 500,
+  fontFamilies: FontFamilies = { text: '', code: '', terminal: '' },
 ): ThemeSnapshot {
   // The presenter must key off colorScheme, not the id — keep them distinct.
   const active = { id: `${colorScheme}-test`, colorScheme, tokens }
-  return { preference, fontSize, fontWeight, active, themes: [active], revision: 1 }
+  return {
+    preference, fontSizes: { text: fontSize, code: 11, terminal: 13 }, fontFamilies, fontWeight, active, themes: [active], revision: 1,
+  }
 }
 
 function clearThemePresentation(): void {
@@ -72,14 +76,6 @@ describe('ThemePresenter', () => {
     expect(document.head.querySelectorAll('meta[name="theme-color"]')).toHaveLength(1)
   })
 
-  it('projects the persisted content font size onto the body and updates on change', () => {
-    const presenter = new ThemePresenter()
-    presenter.apply(snapshot('dark', {}, 12))
-    expect(document.body.style.getPropertyValue(CONTENT_FONT_SIZE_VARIABLE)).toBe('12px')
-    presenter.apply(snapshot('dark', {}, 17))
-    expect(document.body.style.getPropertyValue(CONTENT_FONT_SIZE_VARIABLE)).toBe('17px')
-  })
-
   it('projects the persisted font weight onto the body and updates on change', () => {
     const presenter = new ThemePresenter()
     presenter.apply(snapshot('dark', {}, 14, 'dark', 400))
@@ -97,6 +93,35 @@ describe('ThemePresenter', () => {
     expect(document.body.style.getPropertyValue('--dsw-alias-bg')).toBe('#fff')
     // The old theme's extra variable is gone, not merged.
     expect(document.body.style.getPropertyValue('--dsw-alias-fg')).toBe('')
+  })
+
+  it('publishes the content font size and follows changes', () => {
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('light'))
+    expect(document.body.style.getPropertyValue('--dsh-content-font-size')).toBe('14px')
+    expect(document.body.style.getPropertyValue('--dsh-code-font-size')).toBe('11px')
+    expect(document.body.style.getPropertyValue('--dsh-terminal-font-size')).toBe('13px')
+    presenter.apply(snapshot('light', {}, 17))
+    expect(document.body.style.getPropertyValue('--dsh-content-font-size')).toBe('17px')
+  })
+
+  it('publishes non-empty font lists and removes a list once it returns to the built-in stack', () => {
+    const presenter = new ThemePresenter()
+    presenter.apply(snapshot('light', {}, 14, 'light', 500, { text: '"Inter"', code: '"Iosevka"', terminal: '"Hack"' }))
+    // The presenter writes the same variables the ui-theme boot script and token sheet use.
+    for (const [kind, list] of [['text', '"Inter"'], ['code', '"Iosevka"'], ['terminal', '"Hack"']] as const) {
+      expect(document.body.style.getPropertyValue(fontFamilyVariable(kind))).toBe(list)
+    }
+    presenter.apply(snapshot('light', {}, 14, 'light', 500, { text: '"Inter"', code: '"Iosevka"', terminal: '' }))
+    expect(document.body.style.getPropertyValue('--dsh-font-family-text')).toBe('"Inter"')
+    expect(document.body.style.getPropertyValue('--dsh-font-family-code')).toBe('"Iosevka"')
+    expect(document.body.style.getPropertyValue('--dsh-font-family-terminal')).toBe('')
+    presenter.apply(snapshot('light', {}, 14, 'light', 500, { text: '', code: '"Iosevka"', terminal: '"MesloLGS NF"' }))
+    expect(document.body.style.getPropertyValue('--dsh-font-family-text')).toBe('')
+    expect(document.body.style.getPropertyValue('--dsh-font-family-terminal')).toBe('"MesloLGS NF"')
+    presenter.dispose()
+    expect(document.body.style.getPropertyValue('--dsh-font-family-code')).toBe('')
+    expect(document.body.style.getPropertyValue('--dsh-font-family-terminal')).toBe('')
   })
 
   it('publishes the theme source: system stays system, fixed preferences publish the resolved scheme', () => {
@@ -121,6 +146,7 @@ describe('ThemePresenter', () => {
     expect(document.body.style.getPropertyValue(CONTENT_FONT_WEIGHT_VARIABLE)).toBe('')
     expect(document.body.style.getPropertyValue('--dsw-alias-bg')).toBe('')
     expect(document.body.style.getPropertyValue('--dsh-content-font-size')).toBe('')
+    expect(document.body.style.getPropertyValue('--dsh-code-font-size')).toBe('')
     expect(document.body.style.getPropertyValue('--foreign')).toBe('kept')
     expect(meta?.isConnected).toBe(false)
   })

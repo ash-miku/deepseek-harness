@@ -13,7 +13,6 @@ Use this package to inspect a Session workspace's uncommitted Git changes, or co
 ## Table of Contents
 
 - [What it does](#what-it-does)
-- [Composer statistics](#composer-statistics)
 - [Extension points](#extension-points)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
@@ -34,11 +33,6 @@ The package is dual-face.
 Git runs through `execFile` without a shell; every browser-supplied path and ref is validated before it becomes an argument.
 
 -----
-
-<a id="composer-statistics"></a>
-## Composer statistics
-
-The browser contributes uncommitted file totals to `conversation.composer.dock.stats`, beside session usage. It shows localized changed-file copy, green additions, and red deletions. Clicking the statistics selects the current session's Changes tab through the Conversation shell's existing view action. Counts refresh when the session changes, its running state changes, or the window regains focus; clean or unavailable repositories hide the entry. Branch comparison selection does not affect the footer. File counts include staged, unstaged, untracked, and binary changes, and stay the untruncated total when the status list is capped; line totals use the working tree relative to HEAD (the empty tree before the first commit), with untracked text counted as additions. Binary files contribute no text lines.
 
 -----
 

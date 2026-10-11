@@ -20,6 +20,7 @@ import {
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { createConversationStore } from '../src/client/stores.ts'
+import type { SessionInputShell } from '../src/client/input/facade.ts'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 
 usePinnedBrowserLanguages('zh-CN')
@@ -192,7 +193,7 @@ describe('Conversation inject API', () => {
     const b = await bench()
     const { injected } = b.conversationApi(ROOT)
     expect(b.sessionFake.loadOlder).not.toHaveBeenCalled()
-    expect(Object.keys(injected)).toEqual(['hooks', 'bindDraftMirror', 'openView'])
+    expect(Object.keys(injected)).toEqual(['hooks', 'bindDraftPersistence', 'openView'])
     expect(b.viewSource(ROOT).getSnapshot()).toEqual([])
     await b.runtime.dispose()
   })
@@ -285,19 +286,6 @@ describe('Conversation inject API', () => {
     header.injected.selectView('chat')
     expect(activate).toHaveBeenLastCalledWith('chat')
     expect(header.instance.store.getSnapshot().view).toBe('chat')
-    const dockEntry = b.runtime.slots.entries('conversation.composer.dock')[0]!
-    const dockInstance = b.runtime.storeOf('conversation.composer.dock', b.references.get(ROOT)) as ConversationInstance
-    const injectDock = dockEntry.inject as (id: SessionId, actions: ConversationActions) => { selectView(view: string): void }
-    const dock = injectDock(ROOT, dockInstance.actions)
-    dock.selectView('trajectory')
-    expect(activate).toHaveBeenLastCalledWith('trajectory')
-    expect(header.instance.store.getSnapshot().view).toBe('trajectory')
-    expect(body.instance.store.getSnapshot().view).toBe('trajectory')
-    // Restore the precondition of the upstream flow below: the dock selection is
-    // committed, so re-select the remaining View before the removal assertions.
-    header.injected.selectView('chat')
-    expect(header.instance.store.getSnapshot().view).toBe('chat')
-
     removeTrajectory()
     await b.runtime.flush()
     activate.mockClear()
@@ -376,7 +364,7 @@ describe('Conversation inject API', () => {
     expect(state.getSnapshot().draft).toBe('retry me')
 
     const mirrored: string[] = []
-    const unbind = injected.bindDraftMirror(text => mirrored.push(text))
+    const unbind = injected.bindDraftPersistence(draft => mirrored.push(draft.text))
     actions.setDraft('mirrored text')
     expect(mirrored).toEqual(['mirrored text'])
     unbind()
@@ -553,6 +541,26 @@ describe('Conversation inject API', () => {
     expect(b.inputApi(other).state.getSnapshot().draft).toBe('carry me')
     await vi.waitFor(() => { expect(targetUpload).toHaveBeenCalledOnce() })
     expect(b.inputApi(other).state.getSnapshot().attachmentIds).toHaveLength(1)
+    await b.runtime.dispose()
+  })
+
+  it('carries structured references through Workspace selection without flattening them', async () => {
+    const b = await bench()
+    const draft = {
+      text: 'carry @one.ts',
+      references: [{ source: 'reference', ref: '@one.ts', label: 'one.ts', appearance: 'file' as const,
+        clipboardText: '@one.ts', offset: 6, length: 7 }],
+    }
+    const shell = b.inputApi(ROOT).actions as SessionInputShell
+    shell.setDraft(draft)
+    const other = 'structured-target' as SessionId
+    await b.runtime.sessions.add({ id: other, session: {} })
+    b.connectWorkspace.mockResolvedValueOnce(other)
+    await b.residentApi(ROOT).selectWorkspace('workspace-structured' as WorkspaceId)
+    expect(b.inputApi(other).state.getSnapshot().draft).toBe(draft.text)
+    expect(b.inputApi(other).state.getSnapshot().occurrences).toMatchObject(draft.references)
+    expect(b.inputApi(ROOT).state.getSnapshot().draft).toBe('')
+    expect(b.inputApi(ROOT).state.getSnapshot().occurrences).toEqual([])
     await b.runtime.dispose()
   })
 
