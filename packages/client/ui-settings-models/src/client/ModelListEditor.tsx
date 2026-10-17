@@ -21,8 +21,6 @@ import { Button, IconPlusOutlineRegular, Modal } from '@deepseek-ai/dsh-client-u
 import { formatCapacity, parseCapacity } from './DeepSeekModelsEditor.tsx'
 import type { ModelsOperations } from './operations.ts'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
-import { REASONING_LEVELS, levelName, reasoningEffortsOf, reasoningModeOf } from './reasoning.ts'
-import type { ModelReasoningEfforts, ReasoningEfforts, ReasoningLevel } from './reasoning.ts'
 import type { en } from './locales.ts'
 import { ModelRow } from './ModelRow.tsx'
 import styles from './ModelsSection.module.css'
@@ -69,6 +67,12 @@ export interface ModelListEditorProps {
   models: readonly ModelDraft[]
   /** Installed provider whose catalog supplies defaults without endpoint I/O. */
   catalogProvider?: string | undefined
+  /**
+   * Reasoning levels a hand-declared route's rows may declare in
+   * `reasoningEfforts`, in escalation order; absent or empty shows no
+   * reasoning control, leaving a catalog model's levels to the catalog.
+   */
+  reasoningLevels?: readonly string[] | undefined
   /** Route input types for models absent from the installed catalog. */
   defaultInput?: readonly string[] | undefined
   /** Whether the user layer currently owns the whole array; absent on a create. */
@@ -173,17 +177,16 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
   const [candidateQuery, setCandidateQuery] = useState('')
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set())
-  // Capacities and wire spellings are edited as text, so a field's keystrokes
-  // are held here rather than re-derived from the parsed value on every change —
-  // that would rewrite `1000` to `1K` mid-word. Unreadable text is kept past
-  // blur so the refusal names a row the user can still see, which is why this
-  // is one entry PER FIELD: a single buffer would be displaced by editing any
-  // other field, and the abandoned one would render its stored NaN as the
-  // literal `NaN`.
+  // Capacities are edited as text, so a field's keystrokes are held here rather
+  // than re-derived from the parsed count on every change — that would rewrite
+  // `1000` to `1K` mid-word. Unreadable text is kept past blur so the refusal
+  // names a row the user can still see, which is why this is one entry PER
+  // FIELD: a single buffer would be displaced by editing any other field, and
+  // the abandoned one would render its stored NaN as the literal `NaN`.
   const [editing, setEditing] = useState<ReadonlyMap<string, string>>(new Map())
 
-  /** Buffer key for one capacity or wire-spelling field; the row half moves when rows do. */
-  const bufferKey = (index: number, field: string): string => `${String(index)}:${field}`
+  /** Buffer key for one capacity field; the row half moves when rows do. */
+  const bufferKey = (index: number, field: CapacityField): string => `${String(index)}:${field}`
 
   const editCapacity = (index: number, field: CapacityField, text: string): void => {
     setEditing(current => new Map(current).set(bufferKey(index, field), text))
@@ -232,162 +235,6 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
         Object.entries({ ...model, ...next }).filter(([key]) => !cleared.has(key)),
       )
     }))
-  }
-
-  /** Set one row's reasoning declaration, or delete the field to inherit. */
-  const patchReasoning = (index: number, value: ModelReasoningEfforts): void => {
-    onChange(models.map((model, at) => {
-      if (at !== index) return model
-      const next = { ...model }
-      if (value === undefined) Reflect.deleteProperty(next, 'reasoningEfforts')
-      else next['reasoningEfforts'] = value
-      return next
-    }))
-  }
-
-  /** What one checked level's wire spelling currently shows. */
-  const effortText = (model: ModelDraft, index: number, level: ReasoningLevel): string => {
-    const typed = editing.get(bufferKey(index, `effort:${level}`))
-    if (typed !== undefined) return typed
-    const efforts = reasoningEffortsOf(model)
-    if (typeof efforts !== 'object') return ''
-    const value = efforts[level]
-    return typeof value === 'string' ? value : ''
-  }
-
-  /** Drop one level's wire buffer, or all of a row's when `level` is omitted. */
-  const clearEffortBuffers = (index: number, level?: ReasoningLevel): void => {
-    setEditing((current) => {
-      const next = new Map(current)
-      const prefix = `${String(index)}:effort:`
-      for (const key of next.keys()) {
-        if (key.startsWith(prefix) && (level === undefined || key === bufferKey(index, `effort:${level}`))) {
-          next.delete(key)
-        }
-      }
-      return next
-    })
-  }
-
-  /**
-   * Switch a row between inheriting the catalog's capability, declaring a
-   * non-reasoning model, and declaring exact thinking levels.
-   */
-  const setReasoningMode = (index: number, mode: string): void => {
-    clearEffortBuffers(index)
-    if (mode === 'inherit') { patchReasoning(index, undefined); return }
-    if (mode === 'none') { patchReasoning(index, false); return }
-    // Declaring opens with the pair most OpenAI-compatible gateways accept;
-    // the user can remove it or rename each level's wire spelling.
-    const current = reasoningEffortsOf(models[index])
-    patchReasoning(index, typeof current === 'object' ? current : { off: null, high: 'high' })
-  }
-
-  /** Add or remove one offered thinking level. */
-  const toggleReasoningLevel = (index: number, level: ReasoningLevel, checked: boolean): void => {
-    const current = reasoningEffortsOf(models[index])
-    const next: ReasoningEfforts = typeof current === 'object' ? { ...current } : {}
-    clearEffortBuffers(index, level)
-    if (!checked) {
-      Reflect.deleteProperty(next, level)
-    } else if (level === 'off') {
-      next.off = null
-    } else {
-      next[level] = level
-    }
-    patchReasoning(index, next)
-  }
-
-  /** Keep the typed wire spelling; an empty Off maps to null ("send nothing"). */
-  const editReasoningWire = (index: number, level: ReasoningLevel, text: string): void => {
-    const current = reasoningEffortsOf(models[index])
-    const next: ReasoningEfforts = typeof current === 'object' ? { ...current } : {}
-    const trimmed = text.trim()
-    next[level] = level === 'off' && trimmed.length === 0 ? null : trimmed
-    patchReasoning(index, next)
-    setEditing(currentMap => new Map(currentMap).set(bufferKey(index, `effort:${level}`), text))
-  }
-
-  /** Settle a wire field on blur, like the capacities: trim and drop the buffer. */
-  const settleReasoningWire = (index: number, level: ReasoningLevel): void => {
-    const key = bufferKey(index, `effort:${level}`)
-    const typed = editing.get(key)
-    if (typed === undefined) return
-    const current = reasoningEffortsOf(models[index])
-    const next: ReasoningEfforts = typeof current === 'object' ? { ...current } : {}
-    const trimmed = typed.trim()
-    next[level] = level === 'off' && trimmed.length === 0 ? null : trimmed
-    patchReasoning(index, next)
-    setEditing((currentMap) => {
-      const nextMap = new Map(currentMap)
-      nextMap.delete(key)
-      return nextMap
-    })
-  }
-
-  /** One row's per-model thinking declaration, placed inside the row's disclosure. */
-  const reasoningField = (model: ModelDraft, index: number): ReactNode => {
-    const efforts = reasoningEffortsOf(model)
-    const reasoningMode = reasoningModeOf(efforts)
-    return (
-      <div className={styles['modelReasoning']}>
-        <label className={styles['modelField']}>
-          <span className={styles['modelFieldLabel']}>{t('reasoningEfforts')}</span>
-          <select
-            className={`${styles['input']} ${styles['selectInput']}`}
-            value={reasoningMode}
-            aria-label={`${t('reasoningEfforts')} ${index + 1}`}
-            disabled={disabled}
-            onChange={(event) => { setReasoningMode(index, event.target.value) }}
-          >
-            <option value="inherit">{t('reasoningInherit')}</option>
-            <option value="none">{t('reasoningOff')}</option>
-            <option value="declared">{t('reasoningOn')}</option>
-          </select>
-        </label>
-        {reasoningMode === 'declared'
-          ? (
-            <div className={styles['reasoningLevels']}>
-              {REASONING_LEVELS.map((level) => {
-                const checked = typeof efforts === 'object' && efforts[level] !== undefined
-                return (
-                  <label key={level} className={styles['reasoningLevel']}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      aria-label={`${t('reasoningLevel')} ${levelName(level)} ${index + 1}`}
-                      disabled={disabled}
-                      onChange={(event) => {
-                        toggleReasoningLevel(index, level, event.target.checked)
-                      }}
-                    />
-                    <span className={styles['reasoningLevelName']}>{levelName(level)}</span>
-                    {checked
-                      ? (
-                        <input
-                          className={styles['input']}
-                          type="text"
-                          value={effortText(model, index, level)}
-                          placeholder={level === 'off'
-                            ? t('reasoningOffWireHint')
-                            : t('reasoningWireHint')}
-                          aria-label={`${t('reasoningWire')} ${levelName(level)} ${index + 1}`}
-                          disabled={disabled}
-                          onChange={(event) => {
-                            editReasoningWire(index, level, event.target.value)
-                          }}
-                          onBlur={() => { settleReasoningWire(index, level) }}
-                        />
-                      )
-                      : null}
-                  </label>
-                )
-              })}
-            </div>
-          )
-          : null}
-      </div>
-    )
   }
 
   const fetchModels = async (): Promise<void> => {
@@ -521,10 +368,10 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
             inputField="input"
             inputFallback={inputDefaults.get(textOf(model, 'id')) ?? props.defaultInput}
             inputLoading={catalogProvider !== undefined && catalog === undefined}
+            reasoningLevels={props.reasoningLevels}
             expanded={expanded.has(index)}
             disabled={disabled}
             t={t}
-            reasoning={reasoningField(model, index)}
             contextWindow={{
               value: capacityText(model, index, 'contextWindow'),
               placeholder: CAPACITY_HINT.contextWindow,

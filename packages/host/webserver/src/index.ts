@@ -107,6 +107,9 @@ const DEFAULT_COMPRESSION = 'none' as const
 const DEFAULT_COMPRESSION_LEVEL = 1
 const DEFAULT_COMPRESSION_THRESHOLD_BYTES = 1024
 
+/** Loopback origin advertised for an all-interfaces bind, which has no URL form of its own. */
+const LOOPBACK_ORIGIN_HOST = '127.0.0.1'
+
 interface ResolvedConfig extends Config {
   compression: 'none' | 'gzip'
   compressionLevel: number
@@ -196,6 +199,23 @@ export function normalizeBindAddress(host: string): string {
   const parsed = parseIpLiteral(host)
   if (parsed === undefined) throw notLiteralError(host)
   return parsed.toString()
+}
+
+/**
+ * The URL host form of a bind address. Loopback addresses use their canonical
+ * text, so browsers treat them as local, trustworthy origins: a mapped literal
+ * such as `::ffff:127.0.0.1` reads as `127.0.0.1`, and `::0.0.0.1` reads as
+ * `::1`. A redundant loopback zone is dropped; other addresses keep their text,
+ * and IPv6 text is bracketed.
+ * @param host - concrete IPv4 or IPv6 bind literal.
+ * @returns the URL host, or `undefined` when a non-loopback interface zone id makes the address inexpressible in a URL.
+ */
+export function bindUrlHost(host: string): string | undefined {
+  const zoneAt = host.indexOf('%')
+  const bare = zoneAt === -1 ? host : host.slice(0, zoneAt)
+  if (!isLoopbackHost(bare) && zoneAt !== -1) return undefined
+  const text = isLoopbackHost(bare) ? normalizeBindAddress(bare) : host
+  return isIP(text) === 6 ? `[${text}]` : text
 }
 
 function createGzipMiddleware(config: ResolvedConfig): NodeMiddleware {
@@ -294,7 +314,7 @@ export class WebServer extends Service {
   private readonly indexTaps: ((html: string) => string)[] = []
   private fallback: WebRoute['handler'] | undefined
   private server!: Server
-  private listenedPort!: number
+  private listenedPort: number | undefined
   private readonly gzip: NodeMiddleware | undefined
   private readonly tlsConfig: TlsConfig | undefined
 
@@ -306,8 +326,8 @@ export class WebServer extends Service {
     this.gzip = resolved.compression === 'gzip' ? createGzipMiddleware(resolved) : undefined
   }
 
-  /** The listening port (the OS-assigned value when config.port is 0). */
-  get port(): number {
+  /** The listening port (the OS-assigned value when config.port is 0), or `undefined` before `listen` binds. */
+  get port(): number | undefined {
     return this.listenedPort
   }
 
@@ -323,6 +343,24 @@ export class WebServer extends Service {
    */
   get protocol(): 'http:' | 'https:' {
     return this.tlsConfig === undefined ? 'http:' : 'https:'
+  }
+
+  /**
+   * The root URL local clients use to reach the bound listener: the protocol,
+   * the {@link bindUrlHost} form of the bind address, and the listening port.
+   * An all-interfaces bind has no browser-reachable URL of its own, so its
+   * origin is the loopback address of this machine; the per-network addresses
+   * are separate URLs a caller that serves them derives on its own.
+   * @returns the origin, for example `http://127.0.0.1:3080`.
+   * @throws before `listen` binds a port, or when the bind address has no URL form.
+   */
+  getOrigin(): string {
+    const host = isWildcardHost(this.config.host) ? LOOPBACK_ORIGIN_HOST : bindUrlHost(this.config.host)
+    if (host === undefined) {
+      throw new Error(`webserver: bind address ${JSON.stringify(this.config.host)} carries an interface zone id, which no URL can express`)
+    }
+    if (this.listenedPort === undefined) throw new Error('webserver: origin read before the listener bound a port')
+    return `${this.protocol}//${host}:${String(this.listenedPort)}`
   }
 
   /**

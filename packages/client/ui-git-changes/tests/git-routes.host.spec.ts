@@ -82,7 +82,7 @@ describe('git changes routes', () => {
     await writeFile(join(root, 'empty.txt'), '')
     await writeFile(join(root, 'binary.bin'), Buffer.from([0, 1, 2]))
     const route = routeFixture(root).get(GIT_STATUS_PATH)!
-    const result = await (await route.fetch(new Request(`http://localhost${GIT_STATUS_PATH}?sessionId=owner`))).json()
+    const result = await (await route.fetch(new Request(`http://localhost${GIT_STATUS_PATH}?sessionId=owner`))).json() as { changes: unknown[] }
     expect(result.changes).toEqual([
       expect.objectContaining({ path: 'a.txt', staged: true, unstaged: true, additions: 2, deletions: 0 }),
       expect.objectContaining({ path: 'b.txt', additions: 2, deletions: 0 }),
@@ -98,7 +98,7 @@ describe('git changes routes', () => {
     const route = routeFixture(root).get(GIT_STATUS_PATH)!
     const response = await route.fetch(new Request(`http://localhost${GIT_STATUS_PATH}?sessionId=owner`))
     expect(response.status).toBe(200)
-    const result = await response.json()
+    const result = await response.json() as { changes: unknown[] }
     expect(result.changes).toContainEqual(expect.objectContaining({ path: 'a.txt', additions: 3, deletions: 0 }))
   })
 

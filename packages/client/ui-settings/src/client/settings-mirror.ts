@@ -13,11 +13,6 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 
-/** Return true when the fetch carrier rejected a settings request at the trust fence. */
-function isFenceRefusal(error: unknown): boolean {
-  return error instanceof Error && /^transport failure for \/api\/[^:]+: HTTP 403$/.test(error.message)
-}
-
 /** The full `settings.describe` answer the mirror serves. */
 export interface SettingsDescribeView {
   /** Every namespace a live Host plugin registered, as the Host reported it. */
@@ -31,11 +26,11 @@ export interface SettingsDescribeView {
 /** Mirror state every derived settings surface renders from. */
 export interface SettingsMirrorSnapshot {
   /**
-   * `unavailable` is the terminal non-loopback state; `ready` persists across
-   * later failed refreshes (the held view keeps serving); `idle` means no
-   * answer is held and no read is running, so `ensure` will start one.
+   * `ready` persists across later failed refreshes (the held view keeps serving);
+   * `idle` means no answer is held and no read is running, so `ensure` will
+   * start one.
    */
-  status: 'idle' | 'loading' | 'ready' | 'unavailable'
+  status: 'idle' | 'loading' | 'ready'
   /** The last good answer; undefined until the first success. */
   view: SettingsDescribeView | undefined
   /** The latest refresh failure message, cleared by the next success. */
@@ -57,8 +52,8 @@ export interface SettingsDescribeFace {
    */
   subscribe(listener: () => void): () => void
   /**
-   * Resolve once an answer is held (or the mirror is terminally unavailable),
-   * reading only from `idle`.
+   * Resolve once an answer is held, reading only from `idle`. A settled mirror
+   * holds either a view or the read's error.
    * @returns settlement of the current or newly started read, if any.
    */
   ensure(): Promise<void>
@@ -84,14 +79,10 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
   /**
    * @param ctx - the providing plugin's context, whose `remote.settings`
    * namespace answers the describe read.
-   * @param persistence - client-selected Host persistence; non-loopback pages may remain process-local.
    */
-  constructor(
-    private readonly ctx: ClientContext,
-    private persistence: 'host' | 'memory' | 'probe' = 'host',
-  ) {
+  constructor(private readonly ctx: ClientContext) {
     this.store = createSnapshotStore<SettingsMirrorSnapshot>({
-      status: persistence === 'memory' ? 'unavailable' : 'idle',
+      status: 'idle',
       view: undefined,
       error: null,
     })
@@ -100,14 +91,6 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
   /** @returns the current sync snapshot (stable reference until the next change). */
   getSnapshot(): SettingsMirrorSnapshot {
     return this.store.getSnapshot()
-  }
-
-  /**
-   * Whether trust-fence refusal has switched this mirror to memory mode.
-   * @returns the memory-mode flag.
-   */
-  isMemory(): boolean {
-    return this.persistence === 'memory'
   }
 
   /**
@@ -125,7 +108,6 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
    * @returns settlement after this call's freshness is reflected.
    */
   load(): Promise<void> {
-    if (this.persistence === 'memory') return Promise.resolve()
     if (this.inFlight !== undefined) {
       this.rerun = true
       return this.inFlight
@@ -137,13 +119,10 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
   }
 
   /**
-   * Resolve once an answer is held (or the mirror is terminally unavailable),
-   * reading only from `idle`. The cheap idempotent entry for surfaces that
-   * render on first use.
+   * Resolve once an answer is held, reading only from `idle`.
    * @returns settlement of the current or newly started read, if any.
    */
   ensure(): Promise<void> {
-    if (this.persistence === 'memory') return Promise.resolve()
     if (this.inFlight !== undefined) return this.inFlight
     if (this.getSnapshot().status === 'idle') return this.load()
     return Promise.resolve()
@@ -157,7 +136,6 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
    * @param view - the namespace view a settings write answered with.
    */
   acceptView(view: SettingsNamespaceView): void {
-    if (this.persistence === 'memory') return
     const before = this.store.getSnapshot()
     this.generation += 1
     if (this.inFlight !== undefined) this.rerun = true
@@ -166,29 +144,6 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
       ? before.view.namespaces.map(row => row.ns === view.ns ? view : row)
       : [...before.view.namespaces, view]
     this.store.set({ ...before, view: { ...before.view, namespaces } })
-  }
-
-  /** Downgrade a probe after a 403 so later settings writes stay process-local. */
-  downgrade(): void {
-    if (this.persistence === 'memory') return
-    this.persistence = 'memory'
-    this.generation += 1
-    this.rerun = false
-    this.store.update((draft) => {
-      draft.status = 'unavailable'
-      draft.error = null
-    })
-  }
-
-  /** Retry a previously refused probe after the trust handshake settles. */
-  retryProbe(): void {
-    if (this.persistence !== 'memory') return
-    this.persistence = 'probe'
-    this.generation += 1
-    this.store.update((draft) => {
-      draft.status = 'idle'
-      draft.error = null
-    })
   }
 
   /**
@@ -222,10 +177,6 @@ export class SettingsDescribeMirror implements SettingsDescribeFace {
             ? { view: response.value }
             : { failure: response.error.message }
         } catch (error) {
-          if (isFenceRefusal(error)) {
-            this.downgrade()
-            return
-          }
           outcome = { failure: error instanceof Error ? error.message : String(error) }
         }
         // A write answer invalidates a document read before that write committed.

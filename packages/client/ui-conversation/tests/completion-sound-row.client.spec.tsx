@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { bindSnapshotSelector, makeTranslate, stubConfigForm } from '@deepseek-ai/dsh-client-test-runtime'
+import { allowAllAccess, bindSnapshotSelector, makeTranslate, stubConfigForm } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
 import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
@@ -46,6 +46,7 @@ function mount() {
   const preference = new CompletionSoundPreference()
   const preview = vi.fn()
   const props: CompletionSoundRowProps = {
+    ...allowAllAccess,
     usePanelInfo: selector => selector({ activePanelId: null }),
     useSessions: emptySessions(),
     useSessionStatus: emptySessionStatuses(),
@@ -65,6 +66,7 @@ function mount() {
 function mountVolume() {
   const preference = new CompletionSoundPreference()
   const props: CompletionSoundVolumeRowProps = {
+    ...allowAllAccess,
     usePanelInfo: selector => selector({ activePanelId: null }),
     useSessions: emptySessions(),
     useSessionStatus: emptySessionStatuses(),
