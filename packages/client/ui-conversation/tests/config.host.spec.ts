@@ -14,7 +14,7 @@ describe('ui-conversation host', () => {
     const ctx = new Context()
     const configuration = await liveConfig(ctx, { Config, apply })
     const { fiber } = configuration
-    expect(plainConfig(configuration.fiber.config)).toEqual({
+    expect(plainConfig(configuration.fiber.effectiveConfig)).toEqual({
       busyEnter: DEFAULT_BUSY_ENTER_BEHAVIOR,
       completionSound: DEFAULT_COMPLETION_SOUND,
       completionSoundTone: DEFAULT_COMPLETION_SOUND_TONE,
@@ -24,7 +24,7 @@ describe('ui-conversation host', () => {
     await configuration.update({
       completionSound: false, completionSoundTone: 'bell', completionSoundVolume: 55,
     })
-    expect(plainConfig(configuration.fiber.config)).toEqual({
+    expect(plainConfig(configuration.fiber.effectiveConfig)).toEqual({
       busyEnter: 'steer',
       completionSound: false,
       completionSoundTone: 'bell',

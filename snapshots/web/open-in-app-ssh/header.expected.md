@@ -6,3 +6,4 @@
     - tab "Chat" [selected]
     - tab "Trajectory"
     - tab "Changes"
+  - button "More conversation views"

@@ -51,8 +51,10 @@
   cursor: pointer;
 }
 
-.trigger:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .trigger:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .trigger:focus-visible {
@@ -122,9 +124,11 @@
   font: inherit;
 }
 
-.refresh:hover,
-.segmentButton:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .refresh:hover,
+  .segmentButton:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .body {
@@ -158,8 +162,10 @@
   font: inherit;
 }
 
-.file:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .file:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .fileActive {
@@ -363,8 +369,10 @@
   white-space: nowrap;
 }
 
-.composerStats:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .composerStats:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .composerStats:focus-visible {

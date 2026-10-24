@@ -58,8 +58,10 @@
   cursor: pointer;
 }
 
-.step:hover:not(.selected) {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .step:hover:not(.selected) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 .selected {
